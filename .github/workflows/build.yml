@@ -70,6 +70,13 @@ jobs:
     - name: Create PublishProfile
       shell: pwsh
       run: |
+        # 为主项目创建发布配置
+        $mainProjectPath = "BetterGenshinImpact"
+        $publishProfilePath = "$mainProjectPath\Properties\PublishProfiles"
+        
+        # 确保目录存在
+        New-Item -Path $publishProfilePath -ItemType Directory -Force
+        
         $profileContent = @"
         <?xml version="1.0" encoding="utf-8"?>
         <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
@@ -88,7 +95,38 @@ jobs:
           </PropertyGroup>
         </Project>
         "@
-        $profileContent | Out-File -FilePath "Properties\PublishProfiles\FolderProfile.pubxml" -Encoding UTF8
+        
+        # 写入发布配置文件
+        $profileContent | Out-File -FilePath "$publishProfilePath\FolderProfile.pubxml" -Encoding UTF8
+        
+        Write-Host "发布配置文件已创建在: $publishProfilePath\FolderProfile.pubxml"
+        
+        # 为其他项目创建基础发布配置
+        $projects = @(
+            "Fischless.WindowsInput",
+            "Fischless.HotkeyCapture",
+            "Fischless.GameCapture",
+            "Test\BetterGenshinImpact.UnitTest",
+            "Test\BetterGenshinImpact.Test"
+        )
+        
+        foreach ($project in $projects) {
+            $projectPublishPath = "$project\Properties\PublishProfiles"
+            New-Item -Path $projectPublishPath -ItemType Directory -Force
+            
+            $basicProfileContent = @"
+        <?xml version="1.0" encoding="utf-8"?>
+        <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+          <PropertyGroup>
+            <Configuration>Release</Configuration>
+            <Platform>x64</Platform>
+            <PublishProtocol>FileSystem</PublishProtocol>
+          </PropertyGroup>
+        </Project>
+        "@
+            $basicProfileContent | Out-File -FilePath "$projectPublishPath\FolderProfile.pubxml" -Encoding UTF8
+            Write-Host "基础发布配置文件已创建在: $projectPublishPath\FolderProfile.pubxml"
+        }
 
     - name: Build Solution
       run: |
