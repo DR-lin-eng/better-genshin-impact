@@ -1,7 +1,6 @@
-﻿using BetterGenshinImpact.Core.Config;
+using BetterGenshinImpact.Core.Config;
 using BetterGenshinImpact.Service.Interface;
 using BetterGenshinImpact.Service.Notification;
-using BetterGenshinImpact.Service.Notifier;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
@@ -12,6 +11,7 @@ namespace BetterGenshinImpact.ViewModel.Pages
     {
         public AllConfig Config { get; set; }
         private readonly NotificationService _notificationService;
+        private readonly IConfigService _configService;
 
         [ObservableProperty] 
         private bool _isLoading;
@@ -35,7 +35,7 @@ namespace BetterGenshinImpact.ViewModel.Pages
         [ObservableProperty]
         private string _smtpPassword = string.Empty;
 
-        // 邮件发送配置属性
+        // 邮件配置属性
         [ObservableProperty]
         private string _fromEmail = string.Empty;
 
@@ -45,51 +45,54 @@ namespace BetterGenshinImpact.ViewModel.Pages
         [ObservableProperty]
         private string _toEmail = string.Empty;
 
-        public NotificationSettingsPageViewModel(IConfigService configService, NotificationService notificationService)
+        public NotificationSettingsPageViewModel(
+            IConfigService configService, 
+            NotificationService notificationService)
         {
+            _configService = configService;
             Config = configService.Get();
             _notificationService = notificationService;
 
-            // 初始化邮件配置
+            // 初始化配置
             LoadEmailConfig();
         }
 
         private void LoadEmailConfig()
         {
-            // 从Config加载邮件配置
-            SmtpServer = Config.Notification.Email.SmtpServer;
-            SmtpPort = Config.Notification.Email.SmtpPort;
-            SmtpUsername = Config.Notification.Email.SmtpUsername;
-            SmtpPassword = Config.Notification.Email.SmtpPassword;
-            FromEmail = Config.Notification.Email.FromEmail;
-            FromName = Config.Notification.Email.FromName;
-            ToEmail = Config.Notification.Email.ToEmail;
+            // 从 NotificationConfig 加载配置
+            SmtpServer = Config.NotificationConfig.SmtpServer;
+            SmtpPort = Config.NotificationConfig.SmtpPort;
+            SmtpUsername = Config.NotificationConfig.SmtpUsername;
+            SmtpPassword = Config.NotificationConfig.SmtpPassword;
+            FromEmail = Config.NotificationConfig.FromEmail;
+            FromName = Config.NotificationConfig.FromName;
+            ToEmail = Config.NotificationConfig.ToEmail;
         }
 
         [RelayCommand]
         private async Task OnSaveEmailConfig()
         {
             IsLoading = true;
-            
+            EmailStatus = string.Empty;
+
             try
             {
-                // 更新配置
-                Config.Notification.Email.SmtpServer = SmtpServer;
-                Config.Notification.Email.SmtpPort = SmtpPort;
-                Config.Notification.Email.SmtpUsername = SmtpUsername;
-                Config.Notification.Email.SmtpPassword = SmtpPassword;
-                Config.Notification.Email.FromEmail = FromEmail;
-                Config.Notification.Email.FromName = FromName;
-                Config.Notification.Email.ToEmail = ToEmail;
+                // 更新 NotificationConfig
+                Config.NotificationConfig.SmtpServer = SmtpServer;
+                Config.NotificationConfig.SmtpPort = SmtpPort;
+                Config.NotificationConfig.SmtpUsername = SmtpUsername;
+                Config.NotificationConfig.SmtpPassword = SmtpPassword;
+                Config.NotificationConfig.FromEmail = FromEmail;
+                Config.NotificationConfig.FromName = FromName;
+                Config.NotificationConfig.ToEmail = ToEmail;
 
                 // 保存配置
-                await Config.SaveAsync();
-                
-                EmailStatus = "配置保存成功";
+                await _configService.SaveAsync();
+                EmailStatus = "配置已保存";
             }
             catch (System.Exception ex)
             {
-                EmailStatus = $"保存配置失败: {ex.Message}";
+                EmailStatus = $"保存失败: {ex.Message}";
             }
             finally
             {
@@ -102,9 +105,20 @@ namespace BetterGenshinImpact.ViewModel.Pages
         {
             IsLoading = true;
             WebhookStatus = string.Empty;
-            var res = await _notificationService.TestNotifierAsync<WebhookNotifier>();
-            WebhookStatus = res.Message;
-            IsLoading = false;
+
+            try
+            {
+                var res = await _notificationService.TestNotifierAsync<WebhookNotifier>();
+                WebhookStatus = res.Message;
+            }
+            catch (System.Exception ex)
+            {
+                WebhookStatus = $"测试失败: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+            }
         }
 
         [RelayCommand]
