@@ -23,6 +23,7 @@ env:
   NET_VERSION: '8.0'
   WINDOWS_VERSION: '10.0.22621.0'
   CONFIGURATION: Release
+  BUILD_PLATFORM: x64
 
 jobs:
   build:
@@ -33,14 +34,86 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
 
-    - name: Setup .NET
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.3.1
+      with:
+        vs-prerelease: true
+        msbuild-architecture: ${{ env.BUILD_PLATFORM }}
+
+    - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.NET_VERSION }}
+        dotnet-version: |
+          6.0.x
+          7.0.x
+          8.0.x
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.3.1
+    - name: Clear NuGet Cache
+      run: dotnet nuget locals all --clear
+
+    - name: Restore NuGet packages
+      run: |
+        dotnet restore ${{ env.SOLUTION_FILE }} -p:Platform=${{ env.BUILD_PLATFORM }}
+
+    - name: Create Build Directory
+      run: |
+        mkdir -p dist/BetterGI
+
+    # 创建发布配置文件
+    - name: Create PublishProfile
+      shell: pwsh
+      run: |
+        $profileContent = @"
+        <?xml version="1.0" encoding="utf-8"?>
+        <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+          <PropertyGroup>
+            <Configuration>Release</Configuration>
+            <Platform>x64</Platform>
+            <PublishDir>bin\Release\net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}\publish\win-x64\</PublishDir>
+            <PublishProtocol>FileSystem</PublishProtocol>
+            <_TargetId>Folder</_TargetId>
+            <TargetFramework>net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}</TargetFramework>
+            <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+            <SelfContained>true</SelfContained>
+            <PublishSingleFile>false</PublishSingleFile>
+            <PublishReadyToRun>false</PublishReadyToRun>
+            <PublishTrimmed>false</PublishTrimmed>
+          </PropertyGroup>
+        </Project>
+        "@
+        $profileContent | Out-File -FilePath "Properties\PublishProfiles\FolderProfile.pubxml" -Encoding UTF8
+
+    - name: Build Solution
+      run: |
+        msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m /p:RestorePackagesConfig=true /t:restore
+        msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m
+
+    - name: Publish Application
+      run: |
+        dotnet publish BetterGenshinImpact/BetterGenshinImpact.csproj `
+          -c ${{ env.CONFIGURATION }} `
+          -r win-x64 `
+          --self-contained true `
+          -p:Platform=${{ env.BUILD_PLATFORM }} `
+          -p:PublishReadyToRun=false `
+          -p:PublishSingleFile=false `
+          -p:PublishTrimmed=false `
+          -f net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}
+
+    - name: Install 7-Zip
+      shell: pwsh
+      run: |
+        $url = "https://www.7-zip.org/a/7z2301-x64.exe"
+        Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
+        Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
+        echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
 
     - name: Get Version
       id: get_version
@@ -54,47 +127,45 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Version: $version"
 
-    - name: Create Build Directory
+    - name: Build Setup Project
       run: |
-        mkdir dist\BetterGI
+        # 清理之前的构建文件
+        Remove-Item -Path "Build/MicaSetup/obj" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "Build/MicaSetup/bin" -Recurse -Force -ErrorAction SilentlyContinue
+        
+        # 构建卸载程序
+        msbuild Build/MicaSetup/MicaSetup.Uninst.csproj `
+          /p:Configuration=${{ env.CONFIGURATION }} `
+          /p:Platform=${{ env.BUILD_PLATFORM }} `
+          /p:RestorePackagesConfig=true `
+          /t:restore,rebuild
+        
+        # 复制卸载程序
+        Copy-Item -Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" `
+                 -Destination "Build/MicaSetup/Resources/Setups/Uninst.exe" `
+                 -Force
+        
+        # 构建安装程序
+        msbuild Build/MicaSetup/MicaSetup.csproj `
+          /p:Configuration=${{ env.CONFIGURATION }} `
+          /p:Platform=${{ env.BUILD_PLATFORM }} `
+          /p:RestorePackagesConfig=true `
+          /t:restore,rebuild
 
-    - name: Build Application
-      run: |
-        dotnet publish -c ${{ env.CONFIGURATION }} -p:PublishProfile=FolderProfile
-
-    - name: Setup 7-Zip
-      shell: pwsh
-      run: |
-        $url = "https://www.7-zip.org/a/7z2301-x64.exe"
-        Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
-        Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
-        echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
-
-    - name: Copy Files to Distribution
-      shell: pwsh
-      run: |
-        $publishPath = "BetterGenshinImpact/bin/x64/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
-        xcopy "$publishPath\*" "dist\BetterGI\" /E /C /I /Y
-        Remove-Item "dist\BetterGI\*.lib"
-        Remove-Item "dist\BetterGI\*ffmpeg*.dll"
-
-    - name: Create Archives
+    - name: Package Application
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.version }}"
-        7z a "BetterGI_v${version}.7z" "./dist/BetterGI/*" -mx=5 -mf=BCJ2 -r
-        Copy-Item "BetterGI_v${version}.7z" "MicaSetup/Resources/Setups/publish.7z"
-
-    - name: Build Uninstaller
-      run: |
-        msbuild MicaSetup\MicaSetup.Uninst.csproj /t:Rebuild /p:Configuration=${{ env.CONFIGURATION }} /p:DeployOnBuild=true /p:PublishProfile=FolderProfile /restore
-
-    - name: Build Setup
-      run: |
-        copy /y .\MicaSetup\bin\${{ env.CONFIGURATION }}\net472\MicaSetup.exe .\MicaSetup\Resources\Setups\Uninst.exe
-        msbuild MicaSetup\MicaSetup.csproj /t:Build /p:Configuration=${{ env.CONFIGURATION }} /p:DeployOnBuild=true /p:PublishProfile=FolderProfile /restore
-        copy /y .\MicaSetup\bin\${{ env.CONFIGURATION }}\net472\MicaSetup.exe .\
-        ren MicaSetup.exe "BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe"
+        $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
+        
+        # 清理不需要的文件
+        Remove-Item -Path "$publishPath/*.lib" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$publishPath/*ffmpeg*.dll" -Force -ErrorAction SilentlyContinue
+        
+        # 打包应用
+        7z a "BetterGI_v${version}.7z" "$publishPath/*" -mx=5 -mf=BCJ2 -r -y
+        Copy-Item "BetterGI_v${version}.7z" "Build/MicaSetup/Resources/Setups/publish.7z" -Force
+        Copy-Item "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" "BetterGI_Setup_v${version}.exe" -Force
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
