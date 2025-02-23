@@ -1,0 +1,117 @@
+name: Build BetterGI
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.0.0)'
+        required: false
+        type: string
+
+env:
+  SOLUTION_FILE: BetterGenshinImpact.sln
+  NET_VERSION: '8.0'
+  WINDOWS_VERSION: '10.0.22621.0'
+  CONFIGURATION: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.NET_VERSION }}
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.3.1
+
+    - name: Get Version
+      id: get_version
+      shell: pwsh
+      run: |
+        $version = Select-String -Path "BetterGenshinImpact/BetterGenshinImpact.csproj" -Pattern '<AssemblyVersion>(.*)</AssemblyVersion>' | 
+          ForEach-Object { $_.Matches.Groups[1].Value }
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+
+    - name: Create Build Directory
+      run: |
+        mkdir dist\BetterGI
+
+    - name: Build Application
+      run: |
+        dotnet publish -c ${{ env.CONFIGURATION }} -p:PublishProfile=FolderProfile
+
+    - name: Setup 7-Zip
+      shell: pwsh
+      run: |
+        $url = "https://www.7-zip.org/a/7z2301-x64.exe"
+        Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
+        Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
+        echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
+
+    - name: Copy Files to Distribution
+      shell: pwsh
+      run: |
+        $publishPath = "BetterGenshinImpact/bin/x64/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
+        xcopy "$publishPath\*" "dist\BetterGI\" /E /C /I /Y
+        Remove-Item "dist\BetterGI\*.lib"
+        Remove-Item "dist\BetterGI\*ffmpeg*.dll"
+
+    - name: Create Archives
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        7z a "BetterGI_v${version}.7z" "./dist/BetterGI/*" -mx=5 -mf=BCJ2 -r
+        Copy-Item "BetterGI_v${version}.7z" "MicaSetup/Resources/Setups/publish.7z"
+
+    - name: Build Uninstaller
+      run: |
+        msbuild MicaSetup\MicaSetup.Uninst.csproj /t:Rebuild /p:Configuration=${{ env.CONFIGURATION }} /p:DeployOnBuild=true /p:PublishProfile=FolderProfile /restore
+
+    - name: Build Setup
+      run: |
+        copy /y .\MicaSetup\bin\${{ env.CONFIGURATION }}\net472\MicaSetup.exe .\MicaSetup\Resources\Setups\Uninst.exe
+        msbuild MicaSetup\MicaSetup.csproj /t:Build /p:Configuration=${{ env.CONFIGURATION }} /p:DeployOnBuild=true /p:PublishProfile=FolderProfile /restore
+        copy /y .\MicaSetup\bin\${{ env.CONFIGURATION }}\net472\MicaSetup.exe .\
+        ren MicaSetup.exe "BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe"
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: BetterGI-v${{ steps.get_version.outputs.version }}
+        path: |
+          BetterGI_v${{ steps.get_version.outputs.version }}.7z
+          BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          BetterGI_v${{ steps.get_version.outputs.version }}.7z
+          BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
