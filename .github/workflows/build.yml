@@ -83,7 +83,7 @@ jobs:
           <PropertyGroup>
             <Configuration>Release</Configuration>
             <Platform>x64</Platform>
-            <PublishDir>bin\Release\net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}\publish\win-x64\</PublishDir>
+            <PublishDir>bin\x64\Release\net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}\publish\win-x64\</PublishDir>
             <PublishProtocol>FileSystem</PublishProtocol>
             <_TargetId>Folder</_TargetId>
             <TargetFramework>net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}</TargetFramework>
@@ -111,24 +111,41 @@ jobs:
         )
         
         foreach ($project in $projects) {
-            $projectPublishPath = "$project\Properties\PublishProfiles"
-            New-Item -Path $projectPublishPath -ItemType Directory -Force
-            
-            $basicProfileContent = @"
-        <?xml version="1.0" encoding="utf-8"?>
-        <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-          <PropertyGroup>
-            <Configuration>Release</Configuration>
-            <Platform>x64</Platform>
-            <PublishProtocol>FileSystem</PublishProtocol>
-          </PropertyGroup>
-        </Project>
-        "@
-            $basicProfileContent | Out-File -FilePath "$projectPublishPath\FolderProfile.pubxml" -Encoding UTF8
-            Write-Host "基础发布配置文件已创建在: $projectPublishPath\FolderProfile.pubxml"
+            if (Test-Path $project) {
+                $projectPublishPath = "$project\Properties\PublishProfiles"
+                New-Item -Path $projectPublishPath -ItemType Directory -Force
+                
+                $basicProfileContent = @"
+            <?xml version="1.0" encoding="utf-8"?>
+            <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+              <PropertyGroup>
+                <Configuration>Release</Configuration>
+                <Platform>x64</Platform>
+                <PublishProtocol>FileSystem</PublishProtocol>
+              </PropertyGroup>
+            </Project>
+            "@
+                $basicProfileContent | Out-File -FilePath "$projectPublishPath\FolderProfile.pubxml" -Encoding UTF8
+                Write-Host "基础发布配置文件已创建在: $projectPublishPath\FolderProfile.pubxml"
+            } else {
+                Write-Host "项目目录不存在，跳过创建配置: $project"
+            }
         }
 
-    - name: Build Solution
+    - name: List Project Structure
+      shell: pwsh
+      run: |
+        Write-Host "列出项目结构以进行调试..."
+        Get-ChildItem -Recurse -Depth 2 | Out-String
+
+    # 先尝试使用 dotnet build 构建解决方案 
+    - name: Build with dotnet
+      run: |
+        dotnet build ${{ env.SOLUTION_FILE }} -c ${{ env.CONFIGURATION }} -p:Platform=${{ env.BUILD_PLATFORM }}
+      continue-on-error: true
+
+    # 如果使用 dotnet build 失败，则尝试使用 msbuild
+    - name: Build with MSBuild if needed
       run: |
         msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m /p:RestorePackagesConfig=true /t:restore
         msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m
@@ -140,18 +157,32 @@ jobs:
           -r win-x64 `
           --self-contained true `
           -p:Platform=${{ env.BUILD_PLATFORM }} `
-          -p:PublishReadyToRun=false `
-          -p:PublishSingleFile=false `
-          -p:PublishTrimmed=false `
+          -p:PublishProfile=FolderProfile `
           -f net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}
 
-    - name: Install 7-Zip
+    - name: Verify Publish Output
       shell: pwsh
       run: |
-        $url = "https://www.7-zip.org/a/7z2301-x64.exe"
-        Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
-        Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
-        echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
+        $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
+        if (Test-Path $publishPath) {
+          Write-Host "发布成功，输出目录存在: $publishPath"
+          Get-ChildItem $publishPath | Select-Object -First 10 | Format-Table Name, Length
+        } else {
+          Write-Error "发布失败，输出目录不存在: $publishPath"
+          # 查找可能的发布路径
+          Write-Host "尝试寻找可能的发布输出目录..."
+          Get-ChildItem "BetterGenshinImpact/bin" -Recurse -Directory -Filter "publish" | Format-Table FullName
+        }
+
+    - name: Ensure 7-Zip is installed
+      shell: pwsh
+      run: |
+        if (-not (Get-Command 7z -ErrorAction SilentlyContinue)) {
+          $url = "https://www.7-zip.org/a/7z2301-x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
+          Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
+          echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
+        }
 
     - name: Get Version
       id: get_version
@@ -167,28 +198,49 @@ jobs:
 
     - name: Build Setup Project
       run: |
-        # 清理之前的构建文件
-        Remove-Item -Path "Build/MicaSetup/obj" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "Build/MicaSetup/bin" -Recurse -Force -ErrorAction SilentlyContinue
+        # 检查解决方案文件是否包含 MicaSetup 项目
+        $solutionContent = Get-Content ${{ env.SOLUTION_FILE }}
+        $hasMicaSetup = $solutionContent -match "MicaSetup"
         
-        # 构建卸载程序
-        msbuild Build/MicaSetup/MicaSetup.Uninst.csproj `
-          /p:Configuration=${{ env.CONFIGURATION }} `
-          /p:Platform=${{ env.BUILD_PLATFORM }} `
-          /p:RestorePackagesConfig=true `
-          /t:restore,rebuild
-        
-        # 复制卸载程序
-        Copy-Item -Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" `
-                 -Destination "Build/MicaSetup/Resources/Setups/Uninst.exe" `
-                 -Force
-        
-        # 构建安装程序
-        msbuild Build/MicaSetup/MicaSetup.csproj `
-          /p:Configuration=${{ env.CONFIGURATION }} `
-          /p:Platform=${{ env.BUILD_PLATFORM }} `
-          /p:RestorePackagesConfig=true `
-          /t:restore,rebuild
+        if ($hasMicaSetup -and (Test-Path "Build/MicaSetup")) {
+          # 清理之前的构建文件
+          Remove-Item -Path "Build/MicaSetup/obj" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "Build/MicaSetup/bin" -Recurse -Force -ErrorAction SilentlyContinue
+          
+          # 构建卸载程序
+          if (Test-Path "Build/MicaSetup/MicaSetup.Uninst.csproj") {
+            msbuild Build/MicaSetup/MicaSetup.Uninst.csproj `
+              /p:Configuration=${{ env.CONFIGURATION }} `
+              /p:Platform=${{ env.BUILD_PLATFORM }} `
+              /p:RestorePackagesConfig=true `
+              /t:restore,rebuild
+            
+            # 复制卸载程序
+            if (Test-Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe") {
+              New-Item -Path "Build/MicaSetup/Resources/Setups" -ItemType Directory -Force
+              Copy-Item -Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" `
+                      -Destination "Build/MicaSetup/Resources/Setups/Uninst.exe" `
+                      -Force
+            } else {
+              Write-Warning "卸载程序构建成功，但找不到输出文件"
+            }
+          } else {
+            Write-Warning "找不到卸载程序项目，跳过构建"
+          }
+          
+          # 构建安装程序
+          if (Test-Path "Build/MicaSetup/MicaSetup.csproj") {
+            msbuild Build/MicaSetup/MicaSetup.csproj `
+              /p:Configuration=${{ env.CONFIGURATION }} `
+              /p:Platform=${{ env.BUILD_PLATFORM }} `
+              /p:RestorePackagesConfig=true `
+              /t:restore,rebuild
+          } else {
+            Write-Warning "找不到安装程序项目，跳过构建"
+          }
+        } else {
+          Write-Warning "解决方案中找不到 MicaSetup 项目或目录不存在，跳过构建安装程序"
+        }
 
     - name: Package Application
       shell: pwsh
@@ -196,14 +248,39 @@ jobs:
         $version = "${{ steps.get_version.outputs.version }}"
         $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
         
+        # 检查发布路径是否存在
+        if (-not (Test-Path $publishPath)) {
+          Write-Error "发布路径不存在: $publishPath"
+          
+          # 尝试查找可能的发布路径
+          Write-Host "尝试寻找可能的发布路径..."
+          $possiblePaths = Get-ChildItem "BetterGenshinImpact/bin" -Recurse -Directory -Filter "publish" | Select-Object -ExpandProperty FullName
+          
+          if ($possiblePaths) {
+            Write-Host "找到可能的发布路径:"
+            $possiblePaths | ForEach-Object { Write-Host "  $_" }
+            $publishPath = $possiblePaths[0]
+            Write-Host "使用第一个找到的路径: $publishPath"
+          } else {
+            Write-Error "找不到任何发布路径，打包失败"
+            exit 1
+          }
+        }
+        
         # 清理不需要的文件
-        Remove-Item -Path "$publishPath/*.lib" -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$publishPath/*ffmpeg*.dll" -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path "$publishPath/*.lib" -ErrorAction SilentlyContinue | Remove-Item -Force
+        Get-ChildItem -Path "$publishPath/*ffmpeg*.dll" -ErrorAction SilentlyContinue | Remove-Item -Force
         
         # 打包应用
         7z a "BetterGI_v${version}.7z" "$publishPath/*" -mx=5 -mf=BCJ2 -r -y
-        Copy-Item "BetterGI_v${version}.7z" "Build/MicaSetup/Resources/Setups/publish.7z" -Force
-        Copy-Item "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" "BetterGI_Setup_v${version}.exe" -Force
+        
+        # 如果 MicaSetup 存在，也为它准备文件
+        if (Test-Path "Build/MicaSetup/Resources/Setups") {
+          Copy-Item "BetterGI_v${version}.7z" "Build/MicaSetup/Resources/Setups/publish.7z" -Force
+          if (Test-Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe") {
+            Copy-Item "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" "BetterGI_Setup_v${version}.exe" -Force
+          }
+        }
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
