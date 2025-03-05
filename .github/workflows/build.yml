@@ -62,127 +62,9 @@ jobs:
       run: |
         dotnet restore ${{ env.SOLUTION_FILE }} -p:Platform=${{ env.BUILD_PLATFORM }}
 
-    - name: Create Build Directory
-      run: |
-        mkdir -p dist/BetterGI
-
-    # 创建发布配置文件
-    - name: Create PublishProfile
-      shell: pwsh
-      run: |
-        # 为主项目创建发布配置
-        $mainProjectPath = "BetterGenshinImpact"
-        $publishProfilePath = "$mainProjectPath\Properties\PublishProfiles"
-        
-        # 确保目录存在
-        New-Item -Path $publishProfilePath -ItemType Directory -Force
-        
-        $profileContent = @"
-        <?xml version="1.0" encoding="utf-8"?>
-        <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-          <PropertyGroup>
-            <Configuration>Release</Configuration>
-            <Platform>x64</Platform>
-            <PublishDir>bin\x64\Release\net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}\publish\win-x64\</PublishDir>
-            <PublishProtocol>FileSystem</PublishProtocol>
-            <_TargetId>Folder</_TargetId>
-            <TargetFramework>net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}</TargetFramework>
-            <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-            <SelfContained>true</SelfContained>
-            <PublishSingleFile>false</PublishSingleFile>
-            <PublishReadyToRun>false</PublishReadyToRun>
-            <PublishTrimmed>false</PublishTrimmed>
-          </PropertyGroup>
-        </Project>
-        "@
-        
-        # 写入发布配置文件
-        $profileContent | Out-File -FilePath "$publishProfilePath\FolderProfile.pubxml" -Encoding UTF8
-        
-        Write-Host "发布配置文件已创建在: $publishProfilePath\FolderProfile.pubxml"
-        
-        # 为其他项目创建基础发布配置
-        $projects = @(
-            "Fischless.WindowsInput",
-            "Fischless.HotkeyCapture",
-            "Fischless.GameCapture",
-            "Test\BetterGenshinImpact.UnitTest",
-            "Test\BetterGenshinImpact.Test"
-        )
-        
-        foreach ($project in $projects) {
-            if (Test-Path $project) {
-                $projectPublishPath = "$project\Properties\PublishProfiles"
-                New-Item -Path $projectPublishPath -ItemType Directory -Force
-                
-                $basicProfileContent = @"
-            <?xml version="1.0" encoding="utf-8"?>
-            <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-              <PropertyGroup>
-                <Configuration>Release</Configuration>
-                <Platform>x64</Platform>
-                <PublishProtocol>FileSystem</PublishProtocol>
-              </PropertyGroup>
-            </Project>
-            "@
-                $basicProfileContent | Out-File -FilePath "$projectPublishPath\FolderProfile.pubxml" -Encoding UTF8
-                Write-Host "基础发布配置文件已创建在: $projectPublishPath\FolderProfile.pubxml"
-            } else {
-                Write-Host "项目目录不存在，跳过创建配置: $project"
-            }
-        }
-
-    - name: List Project Structure
-      shell: pwsh
-      run: |
-        Write-Host "列出项目结构以进行调试..."
-        Get-ChildItem -Recurse -Depth 2 | Out-String
-
-    # 先尝试使用 dotnet build 构建解决方案 
-    - name: Build with dotnet
+    - name: Build Solution
       run: |
         dotnet build ${{ env.SOLUTION_FILE }} -c ${{ env.CONFIGURATION }} -p:Platform=${{ env.BUILD_PLATFORM }}
-      continue-on-error: true
-
-    # 如果使用 dotnet build 失败，则尝试使用 msbuild
-    - name: Build with MSBuild if needed
-      run: |
-        msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m /p:RestorePackagesConfig=true /t:restore
-        msbuild ${{ env.SOLUTION_FILE }} /p:Configuration=${{ env.CONFIGURATION }} /p:Platform=${{ env.BUILD_PLATFORM }} /m
-
-    - name: Publish Application
-      run: |
-        dotnet publish BetterGenshinImpact/BetterGenshinImpact.csproj `
-          -c ${{ env.CONFIGURATION }} `
-          -r win-x64 `
-          --self-contained true `
-          -p:Platform=${{ env.BUILD_PLATFORM }} `
-          -p:PublishProfile=FolderProfile `
-          -f net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}
-
-    - name: Verify Publish Output
-      shell: pwsh
-      run: |
-        $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
-        if (Test-Path $publishPath) {
-          Write-Host "发布成功，输出目录存在: $publishPath"
-          Get-ChildItem $publishPath | Select-Object -First 10 | Format-Table Name, Length
-        } else {
-          Write-Error "发布失败，输出目录不存在: $publishPath"
-          # 查找可能的发布路径
-          Write-Host "尝试寻找可能的发布输出目录..."
-          Get-ChildItem "BetterGenshinImpact/bin" -Recurse -Directory -Filter "publish" | Format-Table FullName
-        }
-
-    - name: Ensure 7-Zip is installed
-      shell: pwsh
-      run: |
-        if (-not (Get-Command 7z -ErrorAction SilentlyContinue)) {
-          $url = "https://www.7-zip.org/a/7z2301-x64.exe"
-          Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
-          Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
-          echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
-        }
 
     - name: Get Version
       id: get_version
@@ -196,107 +78,74 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Version: $version"
 
-    - name: Build Setup Project
+    - name: Publish Application
       run: |
-        # 检查解决方案文件是否包含 MicaSetup 项目
-        $solutionContent = Get-Content ${{ env.SOLUTION_FILE }}
-        $hasMicaSetup = $solutionContent -match "MicaSetup"
+        dotnet publish BetterGenshinImpact/BetterGenshinImpact.csproj `
+          -c ${{ env.CONFIGURATION }} `
+          -r win-x64 `
+          --self-contained true `
+          -p:Platform=${{ env.BUILD_PLATFORM }} `
+          -f net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}
+
+    - name: Prepare for Packaging
+      shell: pwsh
+      run: |
+        $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/win-x64"
         
-        if ($hasMicaSetup -and (Test-Path "Build/MicaSetup")) {
-          # 清理之前的构建文件
-          Remove-Item -Path "Build/MicaSetup/obj" -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item -Path "Build/MicaSetup/bin" -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path $publishPath)) {
+          Write-Host "标准发布路径不存在，尝试查找其他发布路径..."
+          $possiblePaths = Get-ChildItem "BetterGenshinImpact/bin" -Recurse -Directory -Filter "win-x64" | Select-Object -ExpandProperty FullName
           
-          # 构建卸载程序
-          if (Test-Path "Build/MicaSetup/MicaSetup.Uninst.csproj") {
-            msbuild Build/MicaSetup/MicaSetup.Uninst.csproj `
-              /p:Configuration=${{ env.CONFIGURATION }} `
-              /p:Platform=${{ env.BUILD_PLATFORM }} `
-              /p:RestorePackagesConfig=true `
-              /t:restore,rebuild
-            
-            # 复制卸载程序
-            if (Test-Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe") {
-              New-Item -Path "Build/MicaSetup/Resources/Setups" -ItemType Directory -Force
-              Copy-Item -Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" `
-                      -Destination "Build/MicaSetup/Resources/Setups/Uninst.exe" `
-                      -Force
-            } else {
-              Write-Warning "卸载程序构建成功，但找不到输出文件"
-            }
+          if ($possiblePaths) {
+            $publishPath = $possiblePaths[0]
+            Write-Host "使用找到的发布路径: $publishPath"
           } else {
-            Write-Warning "找不到卸载程序项目，跳过构建"
+            Write-Error "找不到发布路径"
+            exit 1
           }
-          
-          # 构建安装程序
-          if (Test-Path "Build/MicaSetup/MicaSetup.csproj") {
-            msbuild Build/MicaSetup/MicaSetup.csproj `
-              /p:Configuration=${{ env.CONFIGURATION }} `
-              /p:Platform=${{ env.BUILD_PLATFORM }} `
-              /p:RestorePackagesConfig=true `
-              /t:restore,rebuild
-          } else {
-            Write-Warning "找不到安装程序项目，跳过构建"
-          }
-        } else {
-          Write-Warning "解决方案中找不到 MicaSetup 项目或目录不存在，跳过构建安装程序"
         }
+        
+        # 创建打包目录
+        New-Item -Path "dist/BetterGI" -ItemType Directory -Force
+        
+        # 复制文件
+        Write-Host "复制文件从 $publishPath 到 dist/BetterGI"
+        xcopy "$publishPath\*" "dist\BetterGI\" /E /H /I /Y
+        
+        # 清理不需要的文件
+        Get-ChildItem -Path "dist/BetterGI" -Recurse -Include "*.lib", "*ffmpeg*.dll", "*.pdb" | Remove-Item -Force
+        
+        # 创建输出目录
+        New-Item -Path "output" -ItemType Directory -Force
 
     - name: Package Application
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.version }}"
-        $publishPath = "BetterGenshinImpact/bin/${{ env.BUILD_PLATFORM }}/${{ env.CONFIGURATION }}/net${{ env.NET_VERSION }}-windows${{ env.WINDOWS_VERSION }}/publish/win-x64"
         
-        # 检查发布路径是否存在
-        if (-not (Test-Path $publishPath)) {
-          Write-Error "发布路径不存在: $publishPath"
-          
-          # 尝试查找可能的发布路径
-          Write-Host "尝试寻找可能的发布路径..."
-          $possiblePaths = Get-ChildItem "BetterGenshinImpact/bin" -Recurse -Directory -Filter "publish" | Select-Object -ExpandProperty FullName
-          
-          if ($possiblePaths) {
-            Write-Host "找到可能的发布路径:"
-            $possiblePaths | ForEach-Object { Write-Host "  $_" }
-            $publishPath = $possiblePaths[0]
-            Write-Host "使用第一个找到的路径: $publishPath"
-          } else {
-            Write-Error "找不到任何发布路径，打包失败"
-            exit 1
-          }
+        # 确保 7-Zip 可用
+        if (-not (Get-Command 7z -ErrorAction SilentlyContinue)) {
+          $url = "https://www.7-zip.org/a/7z2301-x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile "7z-installer.exe"
+          Start-Process -FilePath "7z-installer.exe" -Args "/S" -Wait
+          $env:PATH += ";C:\Program Files\7-Zip"
         }
-        
-        # 清理不需要的文件
-        Get-ChildItem -Path "$publishPath/*.lib" -ErrorAction SilentlyContinue | Remove-Item -Force
-        Get-ChildItem -Path "$publishPath/*ffmpeg*.dll" -ErrorAction SilentlyContinue | Remove-Item -Force
         
         # 打包应用
-        7z a "BetterGI_v${version}.7z" "$publishPath/*" -mx=5 -mf=BCJ2 -r -y
-        
-        # 如果 MicaSetup 存在，也为它准备文件
-        if (Test-Path "Build/MicaSetup/Resources/Setups") {
-          Copy-Item "BetterGI_v${version}.7z" "Build/MicaSetup/Resources/Setups/publish.7z" -Force
-          if (Test-Path "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe") {
-            Copy-Item "Build/MicaSetup/bin/${{ env.CONFIGURATION }}/net472/MicaSetup.exe" "BetterGI_Setup_v${version}.exe" -Force
-          }
-        }
+        7z a "output/BetterGI_v${version}.7z" "dist/BetterGI" -t7z -mx=5 -r -y
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: BetterGI-v${{ steps.get_version.outputs.version }}
-        path: |
-          BetterGI_v${{ steps.get_version.outputs.version }}.7z
-          BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe
+        path: output/BetterGI_v${{ steps.get_version.outputs.version }}.7z
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          BetterGI_v${{ steps.get_version.outputs.version }}.7z
-          BetterGI_Setup_v${{ steps.get_version.outputs.version }}.exe
+          output/BetterGI_v${{ steps.get_version.outputs.version }}.7z
         draft: false
         prerelease: false
       env:
