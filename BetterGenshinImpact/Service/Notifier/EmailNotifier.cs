@@ -15,9 +15,6 @@ namespace BetterGenshinImpact.Service.Notifier
         // 发件人配置
         private readonly string _fromEmail;
         private readonly string _fromName;
-
-        // 提升 SmtpClient 为类的成员变量
-        private readonly SmtpClient _smtpClient;
         private readonly string _smtpPassword;
         private readonly int _smtpPort;
 
@@ -42,12 +39,9 @@ namespace BetterGenshinImpact.Service.Notifier
             _fromName = fromName;
             ToEmail = toEmail;
 
-            // 在构造函数中初始化 SmtpClient
-            _smtpClient = new SmtpClient(_smtpServer, _smtpPort)
-            {
-                Credentials = new NetworkCredential(_smtpUsername, _smtpPassword),
-                EnableSsl = true
-            };
+            // 忽略SSL证书验证错误
+            ServicePointManager.ServerCertificateValidationCallback =
+                delegate { return true; };
         }
 
         // 收件人邮箱
@@ -61,78 +55,94 @@ namespace BetterGenshinImpact.Service.Notifier
                 throw new NotifierException("收件人邮箱地址为空");
             }
 
-            try
+            // 创建一个新的SmtpClient实例（不复用）
+            using (var smtpClient = new SmtpClient())
             {
-                using var mailMessage = new MailMessage
+                try
                 {
-                    From = new MailAddress(_fromEmail, _fromName),
-                    Subject = FormatEmailSubject(content),
-                    Body = FormatEmailBody(content),
-                    IsBodyHtml = true
-                };
+                    // 配置SMTP客户端
+                    smtpClient.Host = _smtpServer;
+                    smtpClient.Port = _smtpPort;
+                    smtpClient.EnableSsl = true;
+                    smtpClient.DeliveryMethod = SmtpDeliveryMethod.Network;
+                    smtpClient.UseDefaultCredentials = false;
+                    smtpClient.Credentials = new NetworkCredential(_smtpUsername, _smtpPassword);
+                    smtpClient.Timeout = 30000; // 30秒超时
 
-                mailMessage.To.Add(ToEmail);
-
-                // 添加图片处理
-                if (content.Screenshot != null)
-                {
-                    // 获取图片数据
-                    byte[] imageBytes;
-                    using (var ms = new MemoryStream())
+                    // 创建邮件
+                    using (var mailMessage = new MailMessage())
                     {
-                        // 保存图片到内存流中
-                        content.Screenshot.Save(ms, ImageFormat.Jpeg);
-                        imageBytes = ms.ToArray();
-                    }
+                        mailMessage.From = new MailAddress(_fromEmail, _fromName);
+                        mailMessage.To.Add(ToEmail);
+                        mailMessage.Subject = FormatEmailSubject(content);
+                        mailMessage.Body = FormatEmailBody(content);
+                        mailMessage.IsBodyHtml = true;
+                        mailMessage.BodyEncoding = Encoding.UTF8;
+                        mailMessage.SubjectEncoding = Encoding.UTF8;
 
-                    // 添加为附件
-                    using (var attachmentStream = new MemoryStream(imageBytes))
-                    {
-                        var attachment = new Attachment(attachmentStream, "screenshot.jpg", "image/jpeg");
-                        mailMessage.Attachments.Add(attachment);
-                    }
+                        // 添加图片附件（如果存在）
+                        if (content.Screenshot != null)
+                        {
+                            var tempPath = Path.GetTempFileName() + ".jpg";
+                            try
+                            {
+                                // 保存图片到临时文件
+                                content.Screenshot.Save(tempPath, ImageFormat.Jpeg);
 
-                    // 创建HTML视图
-                    var htmlView = AlternateView.CreateAlternateViewFromString(
-                        FormatEmailBodyWithImage(content),
-                        null,
-                        "text/html");
+                                // 从文件添加附件
+                                var attachment = new Attachment(tempPath);
+                                mailMessage.Attachments.Add(attachment);
 
-                    // 添加内联图片
-                    using (var inlineStream = new MemoryStream(imageBytes))
-                    {
-                        var imageResource = new LinkedResource(inlineStream, "image/jpeg");
-                        imageResource.ContentId = "screenshot";
-                        htmlView.LinkedResources.Add(imageResource);
+                                // 发送邮件
+                                await smtpClient.SendMailAsync(mailMessage);
 
-                        // 添加HTML视图
-                        mailMessage.AlternateViews.Add(htmlView);
+                                // 清理附件和临时文件
+                                attachment.Dispose();
+                                if (File.Exists(tempPath)) File.Delete(tempPath);
+                            }
+                            catch (System.Exception ex)
+                            {
+                                // 尝试清理临时文件
+                                try
+                                {
+                                    if (File.Exists(tempPath)) File.Delete(tempPath);
+                                }
+                                catch
+                                {
+                                    /* 忽略清理错误 */
+                                }
+
+                                throw new NotifierException($"发送邮件失败: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            // 没有图片时直接发送
+                            await smtpClient.SendMailAsync(mailMessage);
+                        }
                     }
                 }
-
-                // 发送邮件
-                await _smtpClient.SendMailAsync(mailMessage);
-            }
-            catch (System.Exception ex)
-            {
-                var errorMessage = string.Format("发送邮件失败: {0}", ex.Message);
-                throw new NotifierException(errorMessage);
+                catch (System.Exception ex)
+                {
+                    var errorMessage = $"发送邮件失败: {ex.Message}";
+                    throw new NotifierException(errorMessage);
+                }
             }
         }
 
         private string FormatEmailSubject(BaseNotificationData content)
         {
             // 可以根据实际需求自定义邮件主题格式
-            return string.Format("通知 - {0}", content.GetType().Name);
+            return $"通知 - {content.GetType().Name}";
         }
 
         private string FormatEmailBody(BaseNotificationData content)
         {
             var builder = new StringBuilder();
-            builder.AppendLine("<html><body>");
+            builder.AppendLine("<html><body style='font-family: Arial, sans-serif;'>");
 
             // 添加通知标题
-            builder.AppendLine("<h2>通知详情</h2>");
+            builder.AppendLine("<h2 style='color: #333;'>通知详情</h2>");
 
             // 添加通知内容
             foreach (var prop in content.GetType().GetProperties())
@@ -145,43 +155,11 @@ namespace BetterGenshinImpact.Service.Notifier
                 if (value != null)
                 {
                     builder.AppendFormat("<p><strong>{0}:</strong> {1}</p>", prop.Name, value);
-                    builder.AppendLine();
                 }
             }
 
-            builder.AppendLine("</body></html>");
-            return builder.ToString();
-        }
-
-        private string FormatEmailBodyWithImage(BaseNotificationData content)
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine("<html><body>");
-
-            // 添加通知标题
-            builder.AppendLine("<h2>通知详情</h2>");
-
-            // 添加通知内容
-            foreach (var prop in content.GetType().GetProperties())
-            {
-                // 跳过Screenshot属性，它会单独处理
-                if (prop.Name == "Screenshot")
-                    continue;
-
-                var value = prop.GetValue(content);
-                if (value != null)
-                {
-                    builder.AppendFormat("<p><strong>{0}:</strong> {1}</p>", prop.Name, value);
-                    builder.AppendLine();
-                }
-            }
-
-            // 添加图片，使用cid引用
-            builder.AppendLine("<div style='margin-top: 20px;'>");
-            builder.AppendLine("<p><strong>截图:</strong></p>");
-            builder.AppendLine("<img src='cid:screenshot' alt='截图' style='max-width: 100%;' />");
-            builder.AppendLine("</div>");
-
+            // 添加提示信息
+            builder.AppendLine("<p><em>如有截图，请查看附件。</em></p>");
             builder.AppendLine("</body></html>");
             return builder.ToString();
         }
