@@ -81,7 +81,7 @@ public class NotificationService : IHostedService, IDisposable
     /// </summary>
     public static NotificationService Instance()
     {
-        if (_instance == null) throw new InvalidOperationException("notification.error.serviceNotalized");
+        if (_instance == null) throw new InvalidOperationException("NotificationService is not initialized");
 
         return _instance;
     }
@@ -402,7 +402,7 @@ public class NotificationService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            TaskControl.Logger.LogError(ex, "notification.errorror");
+            TaskControl.Logger.LogError(ex, "notification.error.notificationSendError");
         }
     }
 
@@ -459,7 +459,7 @@ public class NotificationService : IHostedService, IDisposable
             }
             catch (Exception ex)
             {
-                TaskControl.Logger.LogError(ex, "notification.error.baor");
+                TaskControl.Logger.LogError(ex, "notification.error.backgroundNotificationError");
             }
         });
     }
