@@ -65,7 +65,7 @@
                                  VerticalAlignment="Center"
                                  IsEnabled="{Binding IsRepoUrlReadOnly, Converter={StaticResource InverseBooleanConverter}}"
                                  IsReadOnly="{Binding IsRepoUrlReadOnly}"
-                                 Text="{Binding Config.SelectedRepoUrl}" />
+                                 Text="{Binding RepoUrl}" />
                     </StackPanel>
 
                     <!--  第三行：脚本仓库  -->

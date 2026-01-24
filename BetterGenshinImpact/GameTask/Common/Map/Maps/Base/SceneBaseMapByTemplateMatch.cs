@@ -84,7 +84,13 @@ public abstract class SceneBaseMapByTemplateMatch : SceneBaseMap
         using (miniMap)
         using (mask)
         {
-            LocalMatch(miniMap, mask, ConvertImageCoordinatesToGenshinMapCoordinates(new Point2f(prevX, prevY)), ref curResult);
+            var prevMapPos = ConvertImageCoordinatesToGenshinMapCoordinates(new Point2f(prevX, prevY));
+            if (prevMapPos is not Point2f mapPos)
+            {
+                GlobalMatch(miniMap, mask, ref curResult);
+                return UpdateResult(curResult, rank);
+            }
+            LocalMatch(miniMap, mask, mapPos, ref curResult);
             return UpdateResult(curResult, rank);
         }
     }

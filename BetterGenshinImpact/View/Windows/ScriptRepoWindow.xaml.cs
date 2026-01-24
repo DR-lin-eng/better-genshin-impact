@@ -20,14 +20,18 @@ namespace BetterGenshinImpact.View.Windows;
 [ObservableObject]
 public partial class ScriptRepoWindow
 {
+    private const string CustomChannelKey = "custom";
+
     // Update channel class
     public class RepoChannel
     {
+        public string Key { get; set; }
         public string Name { get; set; }
         public string Url { get; set; }
 
-        public RepoChannel(string name, string url)
+        public RepoChannel(string key, string name, string url)
         {
+            Key = key;
             Name = name;
             Url = url;
         }
@@ -42,6 +46,9 @@ public partial class ScriptRepoWindow
 
     // Control whether repository address is read-only
     [ObservableProperty] private bool _isRepoUrlReadOnly = true;
+
+    // Repository URL to display/edit
+    [ObservableProperty] private string _repoUrl = string.Empty;
 
     // Progress-related observable properties
     [ObservableProperty] private bool _isUpdating;
@@ -75,47 +82,65 @@ public partial class ScriptRepoWindow
 
     private void OnConfigPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ScriptConfig.SelectedRepoUrl))
+        if (e.PropertyName == nameof(ScriptConfig.SelectedChannelName))
         {
-            OnConfigSelectedRepoUrlChanged();
+            OnConfigSelectedChannelChanged();
+        }
+        else if (e.PropertyName == nameof(ScriptConfig.CustomRepoUrl))
+        {
+            if (IsCustomChannel(SelectedRepoChannel))
+            {
+                RepoUrl = Config.CustomRepoUrl;
+            }
         }
     }
 
     private void InitializeRepoChannels()
     {
+        var localizationService = App.GetService<ILocalizationService>();
+        var customText = localizationService.GetString("scriptRepo.custom");
+        var customUrl = string.IsNullOrWhiteSpace(Config.CustomRepoUrl)
+            ? "https://example.com/custom-repo"
+            : Config.CustomRepoUrl;
+
         _repoChannels = new ObservableCollection<RepoChannel>
         {
-            new("CNB", "https://cnb.cool/bettergi/bettergi-scripts-list"),
-            new("GitCode", "https://gitcode.com/huiyadanli/bettergi-scripts-list"),
+            new("CNB", "CNB", "https://cnb.cool/bettergi/bettergi-scripts-list"),
+            new("GitCode", "GitCode", "https://gitcode.com/huiyadanli/bettergi-scripts-list"),
             // Currently unavailable
             // new("Gitee", "https://gitee.com/babalae/bettergi-scripts-list"),
-            new("GitHub", "https://github.com/babalae/bettergi-scripts-list"),
-            new(App.GetService<ILocalizationService>().GetString("scriptRepo.custom"), "https://example.com/custom-repo")
+            new("GitHub", "GitHub", "https://github.com/babalae/bettergi-scripts-list"),
+            new(CustomChannelKey, customText, customUrl)
         };
 
-        if (string.IsNullOrEmpty(Config.SelectedRepoUrl))
+        if (string.IsNullOrEmpty(Config.SelectedChannelName))
         {
             // Select the first channel by default
             SelectedRepoChannel = _repoChannels[0];
-            Config.SelectedRepoUrl = SelectedRepoChannel.Url;
+            Config.SelectedChannelName = SelectedRepoChannel.Key;
         }
         else
         {
             // Try to find the corresponding channel based on the URL in the configuration
-            OnConfigSelectedRepoUrlChanged();
+            OnConfigSelectedChannelChanged();
+        }
+
+        if (SelectedRepoChannel != null)
+        {
+            OnSelectedRepoChannelChanged();
         }
     }
 
-    // Config.SelectedRepoUrl change
-    private void OnConfigSelectedRepoUrlChanged()
+    // Config.SelectedChannelName change
+    private void OnConfigSelectedChannelChanged()
     {
-        // If the URL in the configuration doesn't match the currently selected channel, update the selected channel
-        if (string.IsNullOrEmpty(SelectedRepoChannel?.Url) || SelectedRepoChannel.Url != Config.SelectedRepoUrl)
+        // If the channel in the configuration doesn't match the currently selected channel, update the selected channel
+        if (SelectedRepoChannel?.Key == Config.SelectedChannelName)
         {
-            var customText = App.GetService<ILocalizationService>().GetString("scriptRepo.custom");
-            SelectedRepoChannel = _repoChannels.FirstOrDefault(c => c.Url == Config.SelectedRepoUrl) ??
-                                  _repoChannels.FirstOrDefault(c => c.Name == customText) ?? _repoChannels[0];
+            return;
         }
+
+        SelectedRepoChannel = _repoChannels.FirstOrDefault(c => c.Key == Config.SelectedChannelName) ?? _repoChannels[0];
     }
 
     private void OnSelectedRepoChannelChanged()
@@ -126,15 +151,42 @@ public partial class ScriptRepoWindow
         }
 
         // Update repository address read-only status
-        var customText = App.GetService<ILocalizationService>().GetString("scriptRepo.custom");
-        IsRepoUrlReadOnly = SelectedRepoChannel.Name != customText;
+        IsRepoUrlReadOnly = !IsCustomChannel(SelectedRepoChannel);
 
-        // Update selected repository URL in configuration
-        if (SelectedRepoChannel.Name != customText)
+        if (IsCustomChannel(SelectedRepoChannel))
         {
-            // If not a custom channel, directly use the selected channel's URL
-            Config.SelectedRepoUrl = SelectedRepoChannel.Url;
+            if (string.IsNullOrWhiteSpace(Config.CustomRepoUrl))
+            {
+                Config.CustomRepoUrl = SelectedRepoChannel.Url;
+            }
+            RepoUrl = Config.CustomRepoUrl;
         }
+        else
+        {
+            RepoUrl = SelectedRepoChannel.Url;
+        }
+
+        // Update selected repository channel in configuration
+        if (Config.SelectedChannelName != SelectedRepoChannel.Key)
+        {
+            Config.SelectedChannelName = SelectedRepoChannel.Key;
+        }
+    }
+
+    partial void OnRepoUrlChanged(string value)
+    {
+        if (!IsCustomChannel(SelectedRepoChannel))
+        {
+            return;
+        }
+
+        Config.CustomRepoUrl = value;
+        SelectedRepoChannel!.Url = value;
+    }
+
+    private static bool IsCustomChannel(RepoChannel? channel)
+    {
+        return channel?.Key == CustomChannelKey;
     }
 
     [RelayCommand]
@@ -150,7 +202,7 @@ public partial class ScriptRepoWindow
         try
         {
             // Use the selected channel's URL for update
-            string repoUrl = SelectedRepoChannel.Url;
+            string repoUrl = RepoUrl;
 
             // Show updating notification
             Toast.Information(localizationService.GetString("toast.updatingRepo"));

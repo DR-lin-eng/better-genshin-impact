@@ -227,7 +227,13 @@ public class Genshin
             throw new InvalidOperationException("不在主界面，无法识别小地图坐标");
         }
 
-        return MapManager.GetMap(mapName).ConvertImageCoordinatesToGenshinMapCoordinates(LazyNavigationInstance.Value.GetPositionStableByCache(imageRegion, mapName, cacheTimeMs));
+        var position = MapManager.GetMap(mapName).ConvertImageCoordinatesToGenshinMapCoordinates(
+            LazyNavigationInstance.Value.GetPositionStableByCache(imageRegion, mapName, cacheTimeMs));
+        if (position is not Point2f mapPosition)
+        {
+            throw new InvalidOperationException("无法识别小地图坐标");
+        }
+        return mapPosition;
     }
     
     /// <summary>
@@ -248,7 +254,13 @@ public class Genshin
         var navigationInstance = LazyNavigationInstance.Value;
         var pos = sceneMap.ConvertGenshinMapCoordinatesToImageCoordinates(new Point2f(x, y));
         navigationInstance.SetPrevPosition(pos.X, pos.Y);
-        return sceneMap.ConvertImageCoordinatesToGenshinMapCoordinates(navigationInstance.GetPosition(imageRegion, mapName));
+        var position = sceneMap.ConvertImageCoordinatesToGenshinMapCoordinates(
+            navigationInstance.GetPosition(imageRegion, mapName));
+        if (position is not Point2f mapPosition)
+        {
+            throw new InvalidOperationException("无法识别小地图坐标");
+        }
+        return mapPosition;
     }
 
     #endregion 大地图操作

@@ -16,6 +16,7 @@ using BetterGenshinImpact.Core.Recognition.OCR;
 using BetterGenshinImpact.Core.Script;
 using BetterGenshinImpact.GameTask;
 using BetterGenshinImpact.GameTask.AutoTrackPath;
+using BetterGenshinImpact.GameTask.AutoTrackPath.Model;
 using BetterGenshinImpact.GameTask.Common.Element.Assets;
 using BetterGenshinImpact.GameTask.LogParse;
 using BetterGenshinImpact.Helpers;
@@ -193,8 +194,9 @@ public partial class CommonSettingsPageViewModel : ViewModel
         var areas = MapLazyAssets.Instance.GoddessPositions.Values
             .Where(g => g.Country == country)
             .OrderBy(g => int.TryParse(g.Id, out var id) ? id : int.MaxValue)
-            .GroupBy(g => g.Area)
-            .Select(grp => grp.Key);
+            .Select(GetPrimaryArea)
+            .Where(area => !string.IsNullOrEmpty(area))
+            .Distinct();
         foreach (var area in areas)
         {
             if (!string.IsNullOrEmpty(area))
@@ -210,7 +212,7 @@ public partial class CommonSettingsPageViewModel : ViewModel
         if (string.IsNullOrEmpty(country) || string.IsNullOrEmpty(area)) return;
 
         var goddess = MapLazyAssets.Instance.GoddessPositions.Values
-            .FirstOrDefault(g => g.Country == country && g.Area == area);
+            .FirstOrDefault(g => g.Country == country && GetPrimaryArea(g) == area);
         if (goddess == null) return;
         _tpConfig.ReviveStatueOfTheSevenCountry = country;
         _tpConfig.ReviveStatueOfTheSevenArea = area;
@@ -328,7 +330,16 @@ public partial class CommonSettingsPageViewModel : ViewModel
     [RelayCommand]
     private async Task OnGameLangSelectionChanged(KeyValuePair<string, string> type)
     {
-        await OcrFactory.ChangeCulture(type.Key);
+        var ocrFactory = App.GetService<OcrFactory>();
+        if (ocrFactory != null)
+        {
+            await ocrFactory.Unload();
+        }
+    }
+
+    private static string GetPrimaryArea(GiTpPosition position)
+    {
+        return position.Areas.Length > 0 ? position.Areas[0] : string.Empty;
     }
 
     [RelayCommand]

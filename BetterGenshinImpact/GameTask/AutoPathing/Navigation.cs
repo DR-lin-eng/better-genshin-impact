@@ -3,6 +3,7 @@ using BetterGenshinImpact.GameTask.Model.Area;
 using OpenCvSharp;
 using System;
 using BetterGenshinImpact.GameTask.Common.Element.Assets;
+using BetterGenshinImpact.GameTask;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
 using BetterGenshinImpact.GameTask.Common.Map.Maps;
@@ -15,6 +16,11 @@ public class Navigation
     private static bool _isWarmUp = false;
     
     private static readonly NavigationInstance _instance = new();
+
+    public static void WarmUp()
+    {
+        WarmUp(TaskContext.Instance().Config.PathingConditionConfig.MapMatchingMethod);
+    }
 
     public static void WarmUp(string mapMatchMethod)
     {
@@ -42,6 +48,11 @@ public class Navigation
         return _instance.GetPosition(imageRegion, mapName, mapMatchMethod);
     }
 
+    public static Point2f GetPosition(ImageRegion imageRegion, string mapName)
+    {
+        return _instance.GetPosition(imageRegion, mapName, TaskContext.Instance().Config.PathingConditionConfig.MapMatchingMethod);
+    }
+
     /// <summary>
     /// 稳定获取当前位置坐标，优先使用全地图匹配，适用于不需要高效率但需要高稳定性的场景
     /// </summary>
@@ -52,6 +63,11 @@ public class Navigation
     public static Point2f GetPositionStable(ImageRegion imageRegion, string mapName, string mapMatchMethod)
     {
         return _instance.GetPositionStable(imageRegion, mapName, mapMatchMethod);
+    }
+
+    public static Point2f GetPositionStable(ImageRegion imageRegion, string mapName)
+    {
+        return _instance.GetPositionStable(imageRegion, mapName, TaskContext.Instance().Config.PathingConditionConfig.MapMatchingMethod);
     }
 
     public static int GetTargetOrientation(Waypoint waypoint, Point2f position)

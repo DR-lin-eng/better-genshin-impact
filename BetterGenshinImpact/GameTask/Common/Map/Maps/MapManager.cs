@@ -8,6 +8,11 @@ public static class MapManager
     private static readonly Dictionary<string, ISceneMap> _maps = new();
     private static readonly object LockObject = new();
 
+    public static ISceneMap GetMap(string mapName)
+    {
+        return GetMap(mapName, string.Empty);
+    }
+
     public static ISceneMap GetMap(string mapName, string matchingMethod)
     {
         return GetMap(MapTypesExtensions.ParseFromName(mapName), matchingMethod);
@@ -45,6 +50,11 @@ public static class MapManager
             _maps[key] = map;
             return map;
         }
+    }
+
+    public static ISceneMap GetMap(MapTypes mapType)
+    {
+        return GetMap(mapType, string.Empty);
     }
 
     private static ISceneMap CreateMap(MapTypes mapType, string matchingMethod)

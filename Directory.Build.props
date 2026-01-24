@@ -2,5 +2,9 @@
   <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory).local_sdks')">
     <!-- Use local SDK shims when present to avoid missing workload SDKs. -->
     <MSBuildSDKsPath>$(MSBuildThisFileDirectory).local_sdks</MSBuildSDKsPath>
+    <!-- Ensure bundled versions props resolve from installed SDK root. -->
+    <NETCoreSdkBundledVersionsProps>$(MSBuildExtensionsPath)\Microsoft.NETCoreSdk.BundledVersions.props</NETCoreSdkBundledVersionsProps>
+    <!-- Disable workload resolver to avoid missing workload SDK locator imports. -->
+    <MSBuildEnableWorkloadResolver>false</MSBuildEnableWorkloadResolver>
   </PropertyGroup>
 </Project>

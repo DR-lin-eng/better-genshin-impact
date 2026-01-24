@@ -567,8 +567,19 @@ public partial class TaskSettingsPageViewModel : ViewModel
     private async Task OnSwitchArtifactSalvage()
     {
         SwitchArtifactSalvageEnabled = true;
+        int star = 4;
+        if (!int.TryParse(Config.AutoArtifactSalvageConfig.MaxArtifactStar, out star))
+        {
+            star = 4;
+        }
+        var param = new AutoArtifactSalvageTaskParam(
+            star,
+            Config.AutoArtifactSalvageConfig.JavaScript,
+            Config.AutoArtifactSalvageConfig.ArtifactSetFilter,
+            Config.AutoArtifactSalvageConfig.MaxNumToCheck,
+            Config.AutoArtifactSalvageConfig.RecognitionFailurePolicy);
         await new TaskRunner()
-            .RunSoloTaskAsync(new AutoArtifactSalvageTask(int.Parse(Config.AutoArtifactSalvageConfig.MaxArtifactStar), Config.AutoArtifactSalvageConfig.RegularExpression, Config.AutoArtifactSalvageConfig.MaxNumToCheck));
+            .RunSoloTaskAsync(new AutoArtifactSalvageTask(param));
         SwitchArtifactSalvageEnabled = false;
     }
 
@@ -582,7 +593,9 @@ public partial class TaskSettingsPageViewModel : ViewModel
             return;
         }
         var localizationService2 = App.GetService<ILocalizationService>();
-        OcrDialog ocrDialog = new OcrDialog(0.70, 0.098, 0.24, 0.52, localizationService2.GetString("artifact.decompose"), this.Config.AutoArtifactSalvageConfig.RegularExpression);
+        var ocrDialog = new ArtifactOcrDialog(0.70, 0.098, 0.24, 0.52,
+            localizationService2.GetString("artifact.decompose"),
+            Config.AutoArtifactSalvageConfig.JavaScript);
         ocrDialog.ShowDialog();
     }
 
@@ -592,7 +605,10 @@ public partial class TaskSettingsPageViewModel : ViewModel
         try
         {
             SwitchGetGridIconsEnabled = true;
-            await new TaskRunner().RunSoloTaskAsync(new GetGridIconsTask(Config.GetGridIconsConfig.GridName, Config.GetGridIconsConfig.MaxNumToGet));
+            await new TaskRunner().RunSoloTaskAsync(new GetGridIconsTask(
+                Config.GetGridIconsConfig.GridName,
+                Config.GetGridIconsConfig.StarAsSuffix,
+                Config.GetGridIconsConfig.MaxNumToGet));
         }
         finally
         {

@@ -11,14 +11,14 @@ public class WindowHelper
 {
     public static void TryApplySystemBackdrop(System.Windows.Window window)
     {
-        var themeType = TaskContext.Instance().Config.CommonConfig.CurrentThemeType;
+        var backdropType = TaskContext.Instance().Config.CommonConfig.CurrentBackdropType;
 
         // Wine 平台适配
         if (WinePlatformAddon.IsRunningOnWine)
         {
             try
             {
-                ApplyThemeToWindow(window, themeType);
+                ApplyBackdropToWindow(window, backdropType);
             }
             catch
             {
@@ -27,53 +27,30 @@ public class WindowHelper
         }
         else
         {
-            ApplyThemeToWindow(window, themeType);
+            ApplyBackdropToWindow(window, backdropType);
         }
     }
 
     /// <summary>
-    /// 根据主题类型应用主题到指定窗口
+    /// 根据背景类型应用主题到指定窗口
     /// </summary>
     /// <param name="window">要应用主题的窗口</param>
-    /// <param name="themeType">主题类型</param>
-    public static void ApplyThemeToWindow(System.Windows.Window window, ThemeType themeType)
+    /// <param name="backdropType">背景类型</param>
+    public static void ApplyBackdropToWindow(System.Windows.Window window, WindowBackdropType backdropType)
     {
-        switch (themeType)
+        switch (backdropType)
         {
-            case ThemeType.DarkNone:
+            case WindowBackdropType.None:
                 window.Background = new SolidColorBrush(Color.FromArgb(255, 32, 32, 32));
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.None);
                 break;
-
-            case ThemeType.LightNone:
-                window.Background = new SolidColorBrush(Color.FromArgb(255, 243, 243, 243));
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.None);
-                break;
-
-            case ThemeType.DarkMica:
-                window.Background = new SolidColorBrush(Colors.Transparent);
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.Mica);
-                break;
-
-            case ThemeType.LightMica:
-                window.Background = new SolidColorBrush(Colors.Transparent);
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.Mica);
-                break;
-
-            case ThemeType.DarkAcrylic:
+            case WindowBackdropType.Acrylic:
                 window.Background = new SolidColorBrush(Color.FromArgb(100, 0, 0, 0));
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.Acrylic);
                 break;
-
-            case ThemeType.LightAcrylic:
-                window.Background = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255));
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.Acrylic);
-                break;
-
             default:
                 window.Background = new SolidColorBrush(Colors.Transparent);
-                WindowBackdrop.ApplyBackdrop(window, WindowBackdropType.Mica);
                 break;
         }
+
+        WindowBackdrop.ApplyBackdrop(window, backdropType);
     }
 }

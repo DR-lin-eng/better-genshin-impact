@@ -160,10 +160,10 @@ public partial class PickerWindow : FluentWindow
             {localizationService.GetString("picker.currentSelectedWindow")}: {window.Name} ({window.ProcessName})
             """,
             localizationService.GetString("picker.confirmSelection"),
-            MessageBoxButton.YesNo,
-            MessageBoxResult.No
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxResult.No
         );
-        return res == MessageBoxResult.Yes;
+        return res == System.Windows.MessageBoxResult.Yes;
     }
 
     private void WindowsOnMouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -189,7 +189,7 @@ public partial class PickerWindow : FluentWindow
 
     private void PickerWindow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
         {
             DragMove();
         }
