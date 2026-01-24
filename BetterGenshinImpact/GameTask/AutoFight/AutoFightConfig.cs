@@ -61,6 +61,12 @@ public partial class AutoFightConfig : ObservableObject
         private bool _fastCheckEnabled = false;
         
         /// <summary>
+        /// 旋转寻找敌人位置
+        /// </summary>
+        [ObservableProperty]
+        private bool _rotateFindEnemyEnabled = false;
+        
+        /// <summary>
         /// 快速检查战斗结束的参数，可填入数字和人名，多种用分号分隔，例如:15,白术;钟离;，如果是数字（小于等于0则不会根据时间去检查），则指定检查间隔，如果是人名，则该角色执行一轮操作后进行检查。同时每轮结束后检查不变。
         /// </summary>
         [ObservableProperty]
@@ -77,7 +83,24 @@ public partial class AutoFightConfig : ObservableObject
         /// </summary>
         [ObservableProperty]
         private string _beforeDetectDelay = "";
-
+        
+        /// <summary>
+        /// 旋转寻找敌人位置的旋转因子，默认为5，越大越快。
+        /// </summary>
+        [ObservableProperty]
+        private int _rotaryFactor = 10;
+        
+        /// <summary>
+        /// 是否是第一次检查和面敌。
+        /// </summary>
+        [ObservableProperty]
+        private bool _isFirstCheck = false;
+        
+        /// <summary>
+        /// 是有元素爆发前检查战斗结束
+        /// </summary>
+        [ObservableProperty]
+        private bool _checkBeforeBurst = false;
     }
     /// <summary>
     /// 战斗结束相关配置
@@ -107,12 +130,32 @@ public partial class AutoFightConfig : ObservableObject
     [ObservableProperty]
     private bool _kazuhaPickupEnabled = true;
     
+    [ObservableProperty]
+    private bool _qinDoublePickUp = false;
+    
+    [ObservableProperty]
+    private string _guardianAvatar = string.Empty;
+    
+    [ObservableProperty]
+    private bool _guardianCombatSkip = false;
+    
+    [ObservableProperty]
+    private bool _skipModel = false;
+    
+    [ObservableProperty]
+    private bool _guardianAvatarHold = false;
+    
+    [ObservableProperty]
+    private bool _burstEnabled = false;
+    
     /// <summary>
     /// 战斗结束后，如果不存在万叶，则切换至存在万叶的队伍（基于开启万叶拾取情况下）
     /// </summary>
     [ObservableProperty]
     private string _kazuhaPartyName = "";
     
+    [ObservableProperty]
+    private bool _swimmingEnabled = false;
 
     /// <summary>
     /// 战斗超时，单位秒

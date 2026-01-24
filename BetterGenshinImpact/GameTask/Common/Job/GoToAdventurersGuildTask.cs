@@ -91,7 +91,16 @@ public class GoToAdventurersGuildTask
         if (res == TalkOptionRes.FoundAndClick)
         {
             Logger.LogInformation("▶ {Text}", "领取『每日委托』奖励！");
-            await Delay(500, ct);
+            await Delay(800, ct);
+            
+            // 6.2 每日提示确认
+            var ra1 = CaptureToRectArea();
+            if (Bv.ClickBlackConfirmButton(ra1))
+            {
+                Logger.LogInformation("存在提示并确认");
+            }
+            ra1.Dispose();
+            
             await _chooseTalkOptionTask.SelectLastOptionUntilEnd(ct, null, 3); // 点几下
             await Bv.WaitUntilFound(ElementAssets.Instance.PaimonMenuRo, ct);
             await Delay(500, ct);
@@ -148,6 +157,10 @@ public class GoToAdventurersGuildTask
     public async Task GoToAdventurersGuild(string country, CancellationToken ct)
     {
         var task = PathingTask.BuildFromFilePath(Global.Absolute(@$"GameTask\Common\Element\Assets\Json\冒险家协会_{country}.json"));
+        if (task == null)
+        {
+            throw new Exception("地图追踪文件加载失败");
+        }
         var pathingTask = new PathExecutor(ct)
         {
             PartyConfig = new PathingPartyConfig

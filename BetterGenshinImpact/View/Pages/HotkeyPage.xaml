@@ -54,7 +54,7 @@
                                    Content="{Binding HotKeyTypeName, Mode=OneWay}"
                                    IsEnabled="{Binding SwitchHotkeyTypeEnabled, Mode=OneWay}" />
                         <hotKey:HotKeyTextBox Grid.Column="2"
-                                              HotKeyTypeName="{Binding HotKeyTypeName, Mode=OneWay}"
+                                              HotKeyType="{Binding HotKeyType, Mode=OneWay}"
                                               Hotkey="{Binding HotKey}"
                                               Style="{StaticResource DefaultTextBoxStyle}"
                                               TextAlignment="Center" />
@@ -99,7 +99,7 @@
                                     <DataTemplate>
                                         <hotKey:HotKeyTextBox Padding="16,6,16,6"
                                                               VerticalAlignment="Center"
-                                                              HotKeyTypeName="{Binding HotKeyTypeName, Mode=OneWay}"
+                                                              HotKeyType="{Binding HotKeyType, Mode=OneWay}"
                                                               Hotkey="{Binding HotKey}"
                                                               Style="{StaticResource DefaultTextBoxStyle}"
                                                               TextAlignment="Center"

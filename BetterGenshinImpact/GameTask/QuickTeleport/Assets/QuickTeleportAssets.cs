@@ -14,6 +14,7 @@ public class QuickTeleportAssets : BaseAssets<QuickTeleportAssets>
     public RecognitionObject TeleportButtonRo;
     public RecognitionObject MapScaleButtonRo;
     public RecognitionObject MapCloseButtonRo;
+    public RecognitionObject MapSettingsButtonRo;
     public RecognitionObject MapChooseRo;
 
     public RecognitionObject MapUndergroundSwitchButtonRo;
@@ -35,6 +36,8 @@ public class QuickTeleportAssets : BaseAssets<QuickTeleportAssets>
             BuildMapChooseIconRo("PortableWaypoint.png"),
             BuildMapChooseIconRo("Mansion.png"),
             BuildMapChooseIconRo("SubSpaceWaypoint.png"),
+            BuildMapChooseIconRo("NodKraiMeetingPoint.png"),
+            BuildMapChooseIconRo("TabletOfTona.png"),
         ];
         MapChooseIconGreyMatList = MapChooseIconRoList.ConvertAll(x => x.TemplateImageGreyMat ?? new Mat());
 
@@ -86,6 +89,18 @@ public class QuickTeleportAssets : BaseAssets<QuickTeleportAssets>
                 (int)(19 * AssetScale),
                 (int)(58 * AssetScale),
                 (int)(58 * AssetScale)),
+            DrawOnWindow = false
+        }.InitTemplate();
+
+        MapSettingsButtonRo = new RecognitionObject
+        {
+            Name = "MapSettingsButton",
+            RecognitionType = RecognitionTypes.TemplateMatch,
+            TemplateImageMat = GameTaskManager.LoadAssetImage("QuickTeleport", "MapSettingsButton.png"),
+            RegionOfInterest = new Rect((int)(25 * AssetScale),
+                (int)(990 * AssetScale),
+                (int)(58 * AssetScale),
+                (int)(62 * AssetScale)),
             DrawOnWindow = false
         }.InitTemplate();
 

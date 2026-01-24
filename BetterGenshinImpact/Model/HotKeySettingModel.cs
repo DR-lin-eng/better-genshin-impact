@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using BetterGenshinImpact.Service.Interface;
 using CommunityToolkit.Mvvm.Input;
 using Fischless.HotkeyCapture;
 using System;
@@ -14,6 +15,8 @@ namespace BetterGenshinImpact.Model;
 /// </summary>
 public partial class HotKeySettingModel : ObservableObject
 {
+    private readonly ILocalizationService? _localizationService;
+
     [ObservableProperty] private HotKey _hotKey;
 
     /// <summary>
@@ -63,17 +66,19 @@ public partial class HotKeySettingModel : ObservableObject
 
     public HotKeySettingModel(string functionName)
     {
+        _localizationService = App.GetService<ILocalizationService>();
         FunctionName = functionName;
         IsDirectory = true;
     }
 
     public HotKeySettingModel(string functionName, string configPropertyName, string hotkey, string hotKeyTypeCode, Action<object?, KeyPressedEventArgs>? onKeyPressAction, bool isHold = false)
     {
+        _localizationService = App.GetService<ILocalizationService>();
         FunctionName = functionName;
         ConfigPropertyName = configPropertyName;
         HotKey = HotKey.FromString(hotkey);
         HotKeyType = (HotKeyTypeEnum)Enum.Parse(typeof(HotKeyTypeEnum), hotKeyTypeCode);
-        HotKeyTypeName = HotKeyType.ToChineseName();
+        UpdateHotKeyTypeName();
         OnKeyPressAction = onKeyPressAction;
         IsHold = isHold;
         SwitchHotkeyTypeEnabled = !isHold;
@@ -193,6 +198,15 @@ public partial class HotKeySettingModel : ObservableObject
     public void OnSwitchHotKeyType()
     {
         HotKeyType = HotKeyType == HotKeyTypeEnum.GlobalRegister ? HotKeyTypeEnum.KeyboardMonitor : HotKeyTypeEnum.GlobalRegister;
-        HotKeyTypeName = HotKeyType.ToChineseName();
+    }
+
+    partial void OnHotKeyTypeChanged(HotKeyTypeEnum value)
+    {
+        UpdateHotKeyTypeName();
+    }
+
+    private void UpdateHotKeyTypeName()
+    {
+        HotKeyTypeName = _localizationService?.GetString(HotKeyType.ToLocalizationKey()) ?? HotKeyType.ToChineseName();
     }
 }

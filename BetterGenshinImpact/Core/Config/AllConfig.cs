@@ -1,4 +1,4 @@
-﻿using BetterGenshinImpact.GameTask;
+using BetterGenshinImpact.GameTask;
 using BetterGenshinImpact.GameTask.AutoCook;
 using BetterGenshinImpact.GameTask.AutoDomain;
 using BetterGenshinImpact.GameTask.AutoFight;
@@ -23,6 +23,8 @@ using BetterGenshinImpact.GameTask.AutoMove;
 using BetterGenshinImpact.GameTask.AutoArtifactSalvage;
 using BetterGenshinImpact.GameTask.AutoStygianOnslaught;
 using BetterGenshinImpact.GameTask.GetGridIcons;
+using BetterGenshinImpact.GameTask.AutoEat;
+using BetterGenshinImpact.GameTask.UseRedeemCode;
 
 namespace BetterGenshinImpact.Core.Config;
 
@@ -168,6 +170,16 @@ public partial class AllConfig : ObservableObject
     public AutoArtifactSalvageConfig AutoArtifactSalvageConfig { get; set; } = new();
 
     /// <summary>
+    ///     自动吃药配置
+    /// </summary>
+    public AutoEatConfig AutoEatConfig { get; set; } = new();
+    
+    /// <summary>
+    /// 自动使用
+    /// </summary>
+    public AutoRedeemCodeConfig AutoRedeemCodeConfig { get; set; } = new();
+
+    /// <summary>
     ///     截取物品图标配置
     /// </summary>
     public GetGridIconsConfig GetGridIconsConfig { get; set; } = new();
@@ -259,6 +271,8 @@ public partial class AllConfig : ObservableObject
         AutoDomainConfig.PropertyChanged += OnAnyPropertyChanged;
         AutoStygianOnslaughtConfig.PropertyChanged += OnAnyPropertyChanged;
         AutoArtifactSalvageConfig.PropertyChanged += OnAnyPropertyChanged;
+        AutoRedeemCodeConfig.PropertyChanged += OnAnyPropertyChanged;
+        AutoEatConfig.PropertyChanged += OnAnyPropertyChanged;
         AutoMusicGameConfig.PropertyChanged += OnAnyPropertyChanged;
         AutoTrackConfig.PropertyChanged += OnAnyPropertyChanged;
         AutoMoveConfig.PropertyChanged += OnAnyPropertyChanged;

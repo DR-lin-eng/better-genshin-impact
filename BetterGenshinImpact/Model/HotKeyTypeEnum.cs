@@ -10,6 +10,16 @@ public enum HotKeyTypeEnum
 
 public static class HotKeyTypeEnumExtension
 {
+    public static string ToLocalizationKey(this HotKeyTypeEnum type)
+    {
+        return type switch
+        {
+            HotKeyTypeEnum.GlobalRegister => "hotkey.type.globalRegister",
+            HotKeyTypeEnum.KeyboardMonitor => "hotkey.type.keyboardMonitor",
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+        };
+    }
+
     public static string ToChineseName(this HotKeyTypeEnum type)
     {
         return type switch

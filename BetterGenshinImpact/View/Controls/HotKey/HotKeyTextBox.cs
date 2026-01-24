@@ -8,23 +8,20 @@ namespace BetterGenshinImpact.View.Controls.HotKey;
 
 public class HotKeyTextBox : TextBox
 {
-    public static readonly DependencyProperty HotkeyTypeNameProperty = DependencyProperty.Register(
-        nameof(HotKeyTypeName),
-        typeof(string),
+    public static readonly DependencyProperty HotKeyTypeProperty = DependencyProperty.Register(
+        nameof(HotKeyType),
+        typeof(HotKeyTypeEnum),
         typeof(HotKeyTextBox),
         new FrameworkPropertyMetadata(
-            default(string),
+            default(HotKeyTypeEnum),
             FrameworkPropertyMetadataOptions.BindsTwoWayByDefault
         )
     );
 
-    /// <summary>
-    /// 热键类型 (中文)
-    /// </summary>
-    public string HotKeyTypeName
+    public HotKeyTypeEnum HotKeyType
     {
-        get => (string)GetValue(HotkeyTypeNameProperty);
-        set => SetValue(HotkeyTypeNameProperty, value);
+        get => (HotKeyTypeEnum)GetValue(HotKeyTypeProperty);
+        set => SetValue(HotKeyTypeProperty, value);
     }
 
     public static readonly DependencyProperty HotkeyProperty = DependencyProperty.Register(
@@ -139,11 +136,11 @@ public class HotKeyTextBox : TextBox
         if (key is Key.Enter or Key.Tab && modifiers == ModifierKeys.None)
             return;
 
-        if (HotKeyTypeName == HotKeyTypeEnum.GlobalRegister.ToChineseName() && key is Key.Enter or Key.Space or Key.Tab && modifiers == ModifierKeys.None)
+        if (HotKeyType == HotKeyTypeEnum.GlobalRegister && key is Key.Enter or Key.Space or Key.Tab && modifiers == ModifierKeys.None)
             return;
 
         // If key has a character and pressed without modifiers or only with Shift - return
-        if (HotKeyTypeName == HotKeyTypeEnum.GlobalRegister.ToChineseName() && HasKeyChar(key) && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        if (HotKeyType == HotKeyTypeEnum.GlobalRegister && HasKeyChar(key) && modifiers is ModifierKeys.None or ModifierKeys.Shift)
             return;
 
         // Set value
@@ -158,7 +155,7 @@ public class HotKeyTextBox : TextBox
     {
         if (args.ChangedButton is MouseButton.XButton1 or MouseButton.XButton2)
         {
-            if (HotKeyTypeName == HotKeyTypeEnum.GlobalRegister.ToChineseName())
+            if (HotKeyType == HotKeyTypeEnum.GlobalRegister)
             {
                 Hotkey = new Model.HotKey(Key.None);
             }

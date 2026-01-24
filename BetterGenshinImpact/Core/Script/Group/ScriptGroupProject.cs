@@ -18,6 +18,8 @@ using System.Threading.Tasks;
 using BetterGenshinImpact.GameTask.AutoPathing.Model.Enum;
 using BetterGenshinImpact.GameTask.Common;
 using BetterGenshinImpact.GameTask.FarmingPlan;
+using BetterGenshinImpact.GameTask.LogParse;
+using BetterGenshinImpact.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace BetterGenshinImpact.Core.Script.Group;
@@ -104,6 +106,22 @@ public partial class ScriptGroupProject : ObservableObject
     [ObservableProperty]
     private bool? _allowJsNotification = true;
 
+    [ObservableProperty]
+    private string? _allowJsHTTPHash = "";
+
+    /// <summary>
+    /// 是否允许JS脚本发送HTTP请求，通过验证Hash来控制
+    /// </summary>
+    [JsonIgnore]
+    public bool AllowJsHTTP
+    {
+        get
+        {
+            return GetHttpAllowedUrlsHash() == AllowJsHTTPHash;
+        }
+    }
+
+
     public ScriptGroupProject()
     {
     }
@@ -161,8 +179,35 @@ public partial class ScriptGroupProject : ObservableObject
         Project = new ScriptProject(FolderName);
     }
 
+    public string GetHttpAllowedUrlsHash()
+    {
+        if (Project == null)
+        {
+            BuildScriptProjectRelation();
+        }
+        if (Project == null)
+        {
+            return "";
+        }
+        return string.Join("|", Project.Manifest.HttpAllowedUrls);
+    }
+
     public async Task Run()
     {
+        //执行记录
+        ExecutionRecord executionRecord = new ExecutionRecord()
+        {
+            ServerStartTime =
+                GroupInfo?.Config.PathingConfig.TaskCompletionSkipRuleConfig.IsBoundaryTimeBasedOnServerTime ?? false
+                    ? ServerTimeHelper.GetServerTimeNow()
+                    : DateTimeOffset.Now,
+            StartTime = DateTime.Now,
+            GroupName = GroupInfo?.Name ?? "",
+            FolderName = FolderName,
+            ProjectName = Name,
+            Type = Type
+        };
+        ExecutionRecordStorage.SaveExecutionRecord(executionRecord);
         if (Type == "Javascript")
         {
             if (Project == null)
@@ -184,6 +229,10 @@ public partial class ScriptGroupProject : ObservableObject
         {
             // 加载并执行
             var task = PathingTask.BuildFromFilePath(Path.Combine(MapPathingViewModel.PathJsonPath, FolderName, Name));
+            if (task == null)
+            {
+                return;
+            }
             var pathingTask = new PathExecutor(CancellationContext.Instance.Cts.Token);
             pathingTask.PartyConfig = GroupInfo?.Config.PathingConfig;
             if (pathingTask.PartyConfig is null || pathingTask.PartyConfig.AutoPickEnabled)
@@ -193,7 +242,7 @@ public partial class ScriptGroupProject : ObservableObject
             await pathingTask.Pathing(task);
 
             
-            
+            executionRecord.IsSuccessful = pathingTask.SuccessEnd;
             OtherConfig.AutoRestart autoRestart = TaskContext.Instance().Config.OtherConfig.AutoRestartConfig;
             if (!pathingTask.SuccessEnd)
             {
@@ -208,7 +257,7 @@ public partial class ScriptGroupProject : ObservableObject
             {
                 var successFight = pathingTask.SuccessEnd;
                 var fightCount = 0;
-                
+               
                 //未走完完整路径下，才校验打架次数
                 if (!successFight)
                 {
@@ -243,7 +292,7 @@ public partial class ScriptGroupProject : ObservableObject
                 }
 
             }
-        
+            
 
             
 
@@ -259,6 +308,18 @@ public partial class ScriptGroupProject : ObservableObject
             var task = new ShellTask(ShellTaskParam.BuildFromConfig(Name, shellConfig ?? new ShellConfig()));
             await task.Start(CancellationContext.Instance.Cts.Token);
         }
+
+        if (Type != "Pathing")
+        {
+            executionRecord.IsSuccessful = true;
+        }
+
+        executionRecord.ServerEndTime =
+            GroupInfo?.Config.PathingConfig.TaskCompletionSkipRuleConfig.IsBoundaryTimeBasedOnServerTime ?? false
+                ? ServerTimeHelper.GetServerTimeNow()
+                : DateTimeOffset.Now;
+        executionRecord.EndTime = DateTime.Now;
+        ExecutionRecordStorage.SaveExecutionRecord(executionRecord);
     }
 
     partial void OnTypeChanged(string value)

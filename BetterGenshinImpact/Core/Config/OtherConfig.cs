@@ -1,5 +1,6 @@
 ﻿using System;
-using System.DirectoryServices.ActiveDirectory;
+using BetterGenshinImpact.Core.Recognition;
+using BetterGenshinImpact.Model;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace BetterGenshinImpact.Core.Config;
@@ -14,6 +15,9 @@ public partial class OtherConfig : ObservableObject
     //自动领取派遣任务城市
     [ObservableProperty]
     private string _autoFetchDispatchAdventurersGuildCountry = "无";
+    //服务器时区偏移量
+    [ObservableProperty]
+    private TimeSpan _serverTimeZoneOffset = TimeSpan.FromHours(8);
     [ObservableProperty]
     private AutoRestart _autoRestartConfig = new();
     //锄地规划
@@ -22,6 +26,9 @@ public partial class OtherConfig : ObservableObject
     
     [ObservableProperty]
     private Miyoushe _miyousheConfig = new();
+    //OCR配置
+    [ObservableProperty]
+    private Ocr _ocrConfig = new();
     
 
     public partial class AutoRestart : ObservableObject
@@ -90,6 +97,15 @@ public partial class OtherConfig : ObservableObject
         [ObservableProperty]
         private int _dailyMobCap = 2000;
         
+    }
+    
+    public partial class Ocr : ObservableObject
+    {
+        /// <summary>
+        ///     PaddleOCR模型配置
+        /// </summary>
+        [ObservableProperty]
+        private PaddleOcrModelConfig _paddleOcrModelConfig = PaddleOcrModelConfig.V4Auto;
     }
     
     //public partial class OtherConfig : ObservableObject
