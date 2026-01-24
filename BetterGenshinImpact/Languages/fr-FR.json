@@ -484,6 +484,8 @@
         "task.setDelayDescription": "Le délai réseau cause une reconnaissance trop rapide, peut augmenter de manière appropriée le temps d'attente non reconnu",
         "task.autoWood": "Coupe de bois automatique",
         "task.autoWoodDescription": "Équiper 'Bénédiction de l'Arbre Roi'. Rafraîchir le jeu à travers la téléportation en boucle pour rafraîchir la collecte de bois -",
+        "task.useWonderlandRefresh": "Utiliser l'aller-retour au Wonderland pour réinitialiser le délai des arbres",
+        "task.useWonderlandRefreshDescription": "Nécessite que le Wonderland soit débloqué et déjà visité.",
         "task.loopCount": "Nombre de boucles",
         "task.loopCountDescription": "Combien de fois boucler la coupe de bois, définir 0 pour boucle infinie jusqu'à arrêt manuel",
         "task.enableOcrWoodLimit": "Activer la limite de nombre de bois OCR (résolution de jeu 1080P seulement)",

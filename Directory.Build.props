@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory).local_sdks')">
+    <!-- Use local SDK shims when present to avoid missing workload SDKs. -->
+    <MSBuildSDKsPath>$(MSBuildThisFileDirectory).local_sdks</MSBuildSDKsPath>
+  </PropertyGroup>
+</Project>

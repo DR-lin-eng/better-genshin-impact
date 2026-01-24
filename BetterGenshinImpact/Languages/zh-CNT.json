@@ -515,6 +515,8 @@
     "task.setDelayDescription": "網路延遲導致識別速度過快，可以適當增加未識別到的等待時間",
     "task.autoWood": "自動伐木",
     "task.autoWoodDescription": "裝備「王樹瑞佑」。通過循環傳送刷新遊戲刷新採集木材 -",
+    "task.useWonderlandRefresh": "使用進出千星奇域刷新樹木CD",
+    "task.useWonderlandRefreshDescription": "需要確保已解鎖並進入過千星奇域",
     "task.loopCount": "循環次數",
     "task.currentRunningTasks": "當前運行的任務",
     "task.stopAllTasks": "停止所有任務",

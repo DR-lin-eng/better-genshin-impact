@@ -524,6 +524,8 @@
     "task.setDelayDescription": "ネットワーク遅延により認識速度が速すぎる場合、未認識の待機時間を適切に増やすことができます。",
     "task.autoWood": "自動伐採",
     "task.autoWoodDescription": "「王樹の恩恵」を装備してください。ループワープでゲームをリフレッシュし、木材を採取します -",
+    "task.useWonderlandRefresh": "千星奇域の出入りで樹木のCDを更新",
+    "task.useWonderlandRefreshDescription": "千星奇域を解放済みで、入場済みである必要があります",
     "task.loopCount": "ループ回数",
     "task.currentRunningTasks": "現在実行中のタスク",
     "task.stopAllTasks": "すべてのタスクを停止",

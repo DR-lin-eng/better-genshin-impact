@@ -524,6 +524,8 @@
         "task.setDelayDescription": "If network latency causes recognition to be too fast, you can appropriately increase the waiting time for unrecognized items.",
         "task.autoWood": "Auto Woodcutting",
         "task.autoWoodDescription": "Equip \"Woodland Favor\". Refresh wood collection by loop teleporting -",
+        "task.useWonderlandRefresh": "Use Wonderland cycle to refresh tree cooldown",
+        "task.useWonderlandRefreshDescription": "Requires Wonderland to be unlocked and entered at least once.",
         "task.loopCount": "Loop Count",
         "task.currentRunningTasks": "Currently Running Tasks",
         "task.stopAllTasks": "Stop All Tasks",

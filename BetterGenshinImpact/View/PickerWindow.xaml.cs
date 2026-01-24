@@ -1,20 +1,39 @@
-﻿using BetterGenshinImpact.Helpers.DpiAwareness;
+using BetterGenshinImpact.Helpers.DpiAwareness;
+using BetterGenshinImpact.Helpers.Ui;
 using BetterGenshinImpact.Service.Interface;
+using BetterGenshinImpact.View.Windows;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
-using Vanara.PInvoke;
 using System.Windows.Media;
-using System.Collections.Generic;
 using System.Windows.Media.Imaging;
+using Vanara.PInvoke;
+using Wpf.Ui.Controls;
 
 namespace BetterGenshinImpact.View;
 
-public partial class PickerWindow : Window
+public class CapturableWindow
+{
+    public IntPtr Handle { get; }
+    public string Name { get; }
+    public string ProcessName { get; }
+    public ImageSource? Icon { get; }
+
+    public CapturableWindow(IntPtr handle, string name, string processName, ImageSource? icon)
+    {
+        Handle = handle;
+        Name = name;
+        ProcessName = processName;
+        Icon = icon;
+    }
+}
+
+public partial class PickerWindow : FluentWindow
 {
     private bool _isSelected;
     private readonly bool _captureTest;
@@ -27,28 +46,21 @@ public partial class PickerWindow : Window
     {
         InitializeComponent();
         this.InitializeDpiAwareness();
-        Loaded += OnLoaded;
+        SourceInitialized += OnSourceInitialized;
+        MouseLeftButtonDown += PickerWindow_MouseLeftButtonDown;
         _captureTest = captureTest;
     }
 
-    public class CapturableWindow(IntPtr handle, string name, string processName, ImageSource? icon)
+    private void OnSourceInitialized(object? sender, EventArgs e)
     {
-        public IntPtr Handle { get; } = handle;
-        public string Name { get; } = name;
-        public string ProcessName { get; } = processName;
-        public ImageSource? Icon { get; } = icon;
-    }
-
-    private void OnLoaded(object sender, RoutedEventArgs e)
-    {
-        FindWindows();
+        WindowHelper.TryApplySystemBackdrop(this);
     }
 
     public bool PickCaptureTarget(IntPtr hWnd, out IntPtr pickedWindow)
     {
         new WindowInteropHelper(this).Owner = hWnd;
         ShowDialog();
-        if(!_isSelected)
+        if (!_isSelected)
         {
             pickedWindow = IntPtr.Zero;
             return false;
@@ -79,7 +91,7 @@ public partial class PickerWindow : Window
             _ = User32.GetWindowThreadProcessId(hWnd, out var processId);
             var process = Process.GetProcessById((int)processId);
 
-            // 获取窗口图标
+            // Get the window icon if available.
             var icon = GetWindowIcon((IntPtr)hWnd);
 
             windows.Add(new CapturableWindow((IntPtr)hWnd, title.ToString(), process.ProcessName, icon));
@@ -97,22 +109,19 @@ public partial class PickerWindow : Window
     {
         try
         {
-            const int ICON_BIG = 1;    // WM_GETICON large icon constant
-            const int ICON_SMALL = 0;   // WM_GETICON small icon constant
-            const int GCL_HICON = -14;  // GetClassLong index for icon
+            const int ICON_BIG = 1;
+            const int ICON_SMALL = 0;
+            const int GCL_HICON = -14;
 
-            // 尝试获取窗口大图标
             var iconHandle = User32.SendMessage(hWnd, User32.WindowMessage.WM_GETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
 
             if (iconHandle == IntPtr.Zero)
             {
-                // 尝试获取窗口小图标
                 iconHandle = User32.SendMessage(hWnd, User32.WindowMessage.WM_GETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
             }
 
             if (iconHandle == IntPtr.Zero)
             {
-                // 尝试获取窗口类图标
                 iconHandle = User32.GetClassLong(hWnd, GCL_HICON);
             }
 
@@ -129,26 +138,25 @@ public partial class PickerWindow : Window
             Debug.WriteLine($"{App.GetService<ILocalizationService>().GetString("log.error.failedToGetWindowIcon")}: {ex.Message}");
         }
 
-        // 如果获取失败，返回一个默认图标或null
         return null;
     }
 
     private static bool IsGenshinWindow(CapturableWindow window)
     {
         return window is
-            {Name: "原神", ProcessName: "YuanShen"} or
-            {Name: "云·原神", ProcessName: "Genshin Impact Cloud Game"} or
-            {Name: "Genshin Impact", ProcessName: "GenshinImpact"} or
-            {Name: "Genshin Impact · Cloud", ProcessName: "Genshin Impact Cloud"};
+            { Name: "原神", ProcessName: "YuanShen" } or
+            { Name: "云·原神", ProcessName: "Genshin Impact Cloud Game" } or
+            { Name: "Genshin Impact", ProcessName: "GenshinImpact" } or
+            { Name: "Genshin Impact · Cloud", ProcessName: "Genshin Impact Cloud" };
     }
 
     private static bool AskIsThisGenshinImpact(CapturableWindow window)
     {
         var localizationService = App.GetService<ILocalizationService>();
-        var res = MessageBox.Question(
+        var res = ThemedMessageBox.Question(
             $"""
             {localizationService.GetString("picker.notGenshinConfirmation")}
-        
+
             {localizationService.GetString("picker.currentSelectedWindow")}: {window.Name} ({window.ProcessName})
             """,
             localizationService.GetString("picker.confirmSelection"),
@@ -163,7 +171,6 @@ public partial class PickerWindow : Window
         if (WindowList.SelectedItem is not CapturableWindow selectedWindow)
             return;
 
-        // 如果不是原神窗口，询问用户是否确认
         if (!_captureTest && !IsGenshinWindow(selectedWindow))
         {
             if (!AskIsThisGenshinImpact(selectedWindow))
@@ -172,6 +179,34 @@ public partial class PickerWindow : Window
             }
         }
         _isSelected = true;
+        Close();
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        FindWindows();
+    }
+
+    private void PickerWindow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            DragMove();
+        }
+    }
+
+    private void FluentWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            _isSelected = false;
+            Close();
+        }
+    }
+
+    private void cancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isSelected = false;
         Close();
     }
 }
