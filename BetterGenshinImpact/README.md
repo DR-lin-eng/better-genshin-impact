@@ -2,7 +2,7 @@
 
 参考：[AI生成的项目结构说明](ProjectStructure.md)
 
-## 如何编译并运行整个工程？
+## 如何编译并运行整个工程？1
 
 ### Rider (推荐)
 1. `git clone https://github.com/babalae/better-genshin-impact.git`
