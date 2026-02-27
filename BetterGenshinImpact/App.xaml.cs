@@ -21,6 +21,8 @@ using BetterGenshinImpact.View.Pages;
 using BetterGenshinImpact.ViewModel;
 using BetterGenshinImpact.ViewModel.Pages;
 using BetterGenshinImpact.ViewModel.Pages.View;
+using LazyCache;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,6 +36,7 @@ using Wpf.Ui.Violeta.Controls;
 
 // Wine 平台适配
 using BetterGenshinImpact.Platform.Wine;
+using BetterGenshinImpact.Service.Tavern;
 
 namespace BetterGenshinImpact;
 
@@ -83,7 +86,24 @@ public partial class App : Application
                 }
 
                 Log.Logger = loggerConfiguration.CreateLogger();
-                services.AddLogging(c => c.AddSerilog());
+                services.AddSingleton<IMissingTranslationReporter, SupabaseMissingTranslationReporter>();
+                services.AddSingleton<ITranslationService, JsonTranslationService>();
+                
+                if ("zh-Hans".Equals(all.OtherConfig.UiCultureInfoName, StringComparison.OrdinalIgnoreCase))
+                {
+                    services.AddLogging(c => c.AddSerilog());
+                }
+                else
+                {
+                    services.AddLogging(logging =>
+                    {
+                        logging.ClearProviders();
+                        logging.SetMinimumLevel(LogLevel.Debug);
+                        logging.AddFilter("Microsoft", LogLevel.Warning);
+                        logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
+                        logging.Services.AddSingleton<ILoggerProvider, TranslatingSerilogLoggerProvider>();
+                    });
+                }
 
                 services.AddLocalization();
 
@@ -139,6 +159,12 @@ public partial class App : Application
                 services.AddSingleton<HutaoNamedPipe>();
                 services.AddSingleton<BgiOnnxFactory>();
                 services.AddSingleton<OcrFactory>();
+                services.AddMemoryCache();
+                services.AddSingleton<IAppCache, CachingService>();
+                services.AddSingleton<MemoryFileCache>();
+                services.AddSingleton<IMihoyoMapApiService, MihoyoMapApiService>();
+                services.AddSingleton<IKongyingTavernApiService, KongyingTavernApiService>();
+                services.AddSingleton<IMaskMapPointService, MaskMapPointService>();
                 
                 services.AddSingleton(TimeProvider.System);
                 services.AddSingleton<IServerTimeProvider, ServerTimeProvider>();

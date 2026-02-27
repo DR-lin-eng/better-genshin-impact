@@ -22,6 +22,7 @@ public class ElementAssets : BaseAssets<ElementAssets>
     public RecognitionObject InDomainRo;
 
     public RecognitionObject PaimonMenuRo;
+    public RecognitionObject InventoryRo;
     public RecognitionObject BlueTrackPoint;
 
     public RecognitionObject UiLeftTopCookIcon;
@@ -92,6 +93,7 @@ public class ElementAssets : BaseAssets<ElementAssets>
     public RecognitionObject EscDown;
     public RecognitionObject EscWonderlandHome;
     public RecognitionObject WonderlandEnter;
+    public RecognitionObject WonderlandClose;
 
     public RecognitionObject Index1;
     public RecognitionObject Index2;
@@ -198,6 +200,17 @@ public class ElementAssets : BaseAssets<ElementAssets>
             RecognitionType = RecognitionTypes.TemplateMatch,
             TemplateImageMat = GameTaskManager.LoadAssetImage(@"Common\Element", "paimon_menu.png", systemInfo),
             RegionOfInterest = new Rect(0, 0, CaptureRect.Width / 4, CaptureRect.Height / 4),
+            DrawOnWindow = false
+        }.InitTemplate();
+
+        // 背包图标（右上角）
+        // 原图裁剪坐标 1748, 30, 1784, 67 (约36x37)
+        InventoryRo = new RecognitionObject
+        {
+            Name = "Inventory",
+            RecognitionType = RecognitionTypes.TemplateMatch,
+            TemplateImageMat = GameTaskManager.LoadAssetImage(@"Common\Element", "inventory.png", systemInfo),
+            RegionOfInterest = new Rect(CaptureRect.Width * 3 / 4, 0, CaptureRect.Width / 4, (int)(100 * AssetScale)),
             DrawOnWindow = false
         }.InitTemplate();
 
@@ -707,6 +720,12 @@ public class ElementAssets : BaseAssets<ElementAssets>
             Name = "WonderlandEnter",
             RecognitionType = RecognitionTypes.TemplateMatch,
             TemplateImageMat = GameTaskManager.LoadAssetImage(@"Common\Element", "wonderland_enter.png", systemInfo),
+        }.InitTemplate();
+        WonderlandClose = new RecognitionObject
+        {
+            Name = "WonderlandClose",
+            RecognitionType = RecognitionTypes.TemplateMatch,
+            TemplateImageMat = GameTaskManager.LoadAssetImage(@"Common\Element", "wonderland_close.png", systemInfo),
         }.InitTemplate();
 
         Rect partyRect = new Rect(CaptureRect.Width - (int)(65 * AssetScale), (int)(155 * AssetScale), (int)(35 * AssetScale), (int)(600 * AssetScale));
